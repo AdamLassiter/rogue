@@ -1,8 +1,11 @@
 #! /usr/bin/python3
 
+from random import randrange
+
 import pygame
 from pygame.locals import *
-from random import randrange
+pygame.init()
+
 
 BLACK = (0, 0, 0)
 GREY = (100, 100, 100)
@@ -14,8 +17,8 @@ BLUE = (0, 0, 255)
 
 
 class Room:
-    MIN_SIZE = 6
-    MAX_SIZE = 10
+    MIN_SIZE = 10
+    MAX_SIZE = 15
 
     def __init__(self, x, y, w, h):
         self.x1, self.x2 = x, x + w - 1
@@ -39,17 +42,35 @@ class Room:
 class Map:
 
     def __init__(self, size):
-        assert size[0] % 2 == size[1] % 2 == 1
         self.size = size
         self.gen_map()
 
-    def get_at(self, position):
-        x, y = position
-        return self.map[y][x]
+    def __getitem__(self, slices):
+        if isinstance(slices, tuple):
+            h, v = slices
+        else:
+            h, v = slices, slice(0, -1, 1)
+        return_slice = isinstance(h, slice) or isinstance(v, slice)
+        if not isinstance(h, slice):
+            h = slice(h, h + 1)
+        if not isinstance(v, slice):
+            v = slice(v, v + 1)
+        hd, vd = (h.start, h.stop, h.step), (v.start, v.stop, v.step)
+        hl = len(self.map[0])
+        vl = len(self.map)
+        if hd[0] < 0 or hd[1] > hl:
+            return [a + b for a, b in zip(self[hd[0] % hl:hl:hd[2], v],
+                                          self[0:hd[1] % hl:hd[2], v])]
+        if vd[0] < 0 or vd[1] > vl:
+            return self[h, vd[0] % vl:vl:vd[2]] + self[h, 0:vd[1] % vl:vd[2]]
+        return [row[h] for row in self.map[v]] if return_slice else self.map[vd[0]][hd[0]]
 
-    def set_at(self, position, value):
-        x, y = position
-        self.mapdata[y][x] = value
+    def __setitem__(self, slices, val):
+        if isinstance(slices, tuple):
+            h, v = slices
+        else:
+            h, v = slices, slice(None, None, None)
+        self.mapdata[v][h] = val
 
     def gen_map(self):
         def gen_rooms(attempts):
@@ -67,9 +88,9 @@ class Map:
             return rooms
 
         def carve_room(room):
-            for x in range(room.x1, room.x2):
+            for x in range(room.x1, room.x2 + 1):
                 for y in range(room.y1, room.y2 + 1):
-                    self.mapdata[y][x] = ('.', BROWN, False)
+                    self[x, y] = ['#', BROWN, False]
 
         def carve_tunnel(from_room, to_room):
             def horizontal_tunnel(from_x, to_x, y):
@@ -97,9 +118,9 @@ class Map:
                 carve_room(room)
                 last_room = room
 
-        self.mapdata = [[('#', GREY, True) for x in range(self.size[0])]
+        self.mapdata = [[['#', GREY, True] for x in range(self.size[0])]
                         for y in range(self.size[1])]
-        self.rooms = gen_rooms(self.size[0] * self.size[1])
+        self.rooms = gen_rooms(int((self.size[0] * self.size[1]) ** 0.5))
         carve(self.rooms)
         self.update()
 
@@ -107,10 +128,14 @@ class Map:
         self.map = [[Tile((x, y), *t) for x, t in enumerate(row)]
                     for y, row in enumerate(self.mapdata)]
 
-    def draw(self, surface):
-        for row in self.map:
-            for cell in row:
-                cell.draw(surface)
+    def draw(self, surface, position):
+        w, dw = divmod(Game.WIDTH, Sprite.SIZE)
+        h, dh = divmod(Game.HEIGHT, Sprite.SIZE)
+        x0, y0 = position
+        x, y = (x0 + dw - w // 2, y0 + dh - h // 2)
+        for y, row in enumerate(self[x:x + w, y:y + h]):
+            for x, cell in enumerate(row):
+                cell.draw(surface, [x, y])
 
 
 class Tile:
@@ -120,29 +145,28 @@ class Tile:
         self.solid = solid
         self.transparent = not solid if transparent is None else transparent
 
-    def draw(self, surface):
-        self.sprite.draw(surface)
+    def draw(self, surface, position):
+        self.sprite.draw(surface, position)
 
 
 class Sprite:
-    SIZE = 20
+    SIZE = 40
+    FONT = pygame.font.SysFont('Monospace Regular', int(SIZE * 1.5))
 
     def __init__(self, position, character, color=WHITE):
-        self.character = pygame.font.SysFont(
-            'Monospace Regular', Sprite.SIZE).render(character, True, color)
+        self.character = Sprite.FONT.render(character, True, color)
         self.position = position
         self.velocity = [0, 0]
 
-    def draw(self, surface):
-        surface.blit(self.character,
-                     [x * Sprite.SIZE * .75 for x in self.position])
+    def draw(self, surface, position):
+        blit_at = list(map(lambda x: x * Sprite.SIZE, position))
+        surface.blit(self.character, blit_at)
 
     def update(self):
         x, y = self.position
         dx, dy = self.velocity
-        new_pos = (x + dx, y + dy)
-        if not Game.MAP.get_at(new_pos).solid:
-            self.position = new_pos
+        if not Game.MAP[x + dx, y + dy].solid:
+            self.position = [x + dx, y + dy]
 
 
 class Game:
@@ -151,18 +175,18 @@ class Game:
     MAP = None
 
     def __init__(self):
-        pygame.init()
         self.main_surf = pygame.display.set_mode((Game.WIDTH, Game.HEIGHT))
-        self.map = Game.MAP = Map((53, 39))
-        self.player = Sprite((20, 15), '@')
+        self.map = Game.MAP = Map((100, 100))
+        self.player = Sprite(self.map.rooms[0].center(), '@')
 
     def draw(self):
         # clear
         self.main_surf.fill(BLACK)
         # draw background
-        self.map.draw(self.main_surf)
+        self.map.draw(self.main_surf, self.player.position)
         # draw foreground
-        self.player.draw(self.main_surf)
+        self.player.draw(self.main_surf, [Game.WIDTH // Sprite.SIZE // 2,
+                                          Game.HEIGHT // Sprite.SIZE // 2])
         # update
         pygame.display.flip()
 
