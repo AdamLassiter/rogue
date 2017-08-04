@@ -8,12 +8,48 @@ pygame.init()
 
 
 BLACK = (0, 0, 0)
-GREY = (100, 100, 100)
+GREY = (150, 150, 150)
 WHITE = (255, 255, 255)
 BROWN = (70, 35, 10)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
+
+
+class vector(list):
+
+    def __or__(self, other):
+        return vector(list(self) + list(other))
+
+    def __add__(self, other):
+        if isinstance(other, vector):
+            return vector(map(lambda x, y: x + y, self, other))
+        else:
+            return vector(map(lambda x: x + other, self))
+
+    def __neg__(self):
+        return vector(map(lambda x: -x, self))
+
+    def __sub__(self, other):
+        return self + other.__neg__()
+
+    def __mul__(self, other):
+        if isinstance(other, vector):
+            return vector(map(lambda x, y: x * y, self, other))
+        else:
+            return vector(map(lambda x: x * other, self))
+
+    def __div__(self, other):
+        if isinstance(other, vector):
+            return vector(map(lambda x, y: x / y, self, other))
+        else:
+            return vector(map(lambda x: x / other, self))
+
+    def __floordiv__(self, other):
+        if isinstance(other, vector):
+            return vector(map(lambda x, y: x // y, self, other))
+        else:
+            return vector(map(lambda x: x // other, self))
 
 
 class Room:
@@ -32,7 +68,7 @@ class Room:
         return '(%s %s %s %s)' % (self.x1, self.x2, self.y1, self.y2)
 
     def center(self):
-        return (int((self.x1 + self.x2) / 2), int((self.y1 + self.y2) / 2))
+        return vector([self.x1 + self.x2, self.y1 + self.y2]) // 2
 
     def overlaps(self, other):
         return (self.x1 <= other.x2 and self.x2 >= other.x1 and
@@ -90,16 +126,16 @@ class Map:
         def carve_room(room):
             for x in range(room.x1, room.x2 + 1):
                 for y in range(room.y1, room.y2 + 1):
-                    self[x, y] = ['#', BROWN, False]
+                    self[x, y] = ['.', BROWN, False]
 
         def carve_tunnel(from_room, to_room):
             def horizontal_tunnel(from_x, to_x, y):
                 x0, x1 = min((from_x, to_x)), max((from_x, to_x))
-                carve_room(Room(x0, y, x1 - x0, 1))
+                carve_room(Room(x0, y, x1 - x0 + 1, 1))
 
             def vertical_tunnel(from_y, to_y, x):
                 y0, y1 = min((from_y, to_y)), max((from_y, to_y))
-                carve_room(Room(x, y0, 1, y1 - y0))
+                carve_room(Room(x, y0, 1, y1 - y0 + 1))
 
             from_x, from_y = from_room.center()
             to_x, to_y = to_room.center()
@@ -125,17 +161,15 @@ class Map:
         self.update()
 
     def update(self):
-        self.map = [[Tile((x, y), *t) for x, t in enumerate(row)]
+        self.map = [[Tile(vector([x, y]), *t) for x, t in enumerate(row)]
                     for y, row in enumerate(self.mapdata)]
 
     def draw(self, surface, position):
-        w, dw = divmod(Game.WIDTH, Sprite.SIZE)
-        h, dh = divmod(Game.HEIGHT, Sprite.SIZE)
         x0, y0 = position
-        x, y = (x0 + dw - w // 2, y0 + dh - h // 2)
-        for y, row in enumerate(self[x:x + w, y:y + h]):
+        xc, yc = position - Game.CENTER
+        for y, row in enumerate(self[xc:xc + Game.SPRITE_WIDTH, yc:yc + Game.SPRITE_HEIGHT]):
             for x, cell in enumerate(row):
-                cell.draw(surface, [x, y])
+                cell.draw(surface, vector([x, y]))
 
 
 class Tile:
@@ -144,40 +178,88 @@ class Tile:
         self.sprite = Sprite(position, character, color)
         self.solid = solid
         self.transparent = not solid if transparent is None else transparent
+        self.explored = False
 
     def draw(self, surface, position):
-        self.sprite.draw(surface, position)
+        def bresenham(start, end):
+            x1, y1 = start
+            x2, y2 = end
+            dx = x2 - x1
+            dy = y2 - y1
+            is_steep = abs(dy) > abs(dx)
+            if is_steep:
+                x1, y1 = y1, x1
+                x2, y2 = y2, x2
+            swapped = x1 > x2
+            if swapped:
+                x1, x2 = x2, x1
+                y1, y2 = y2, y1
+            dx = x2 - x1
+            dy = y2 - y1
+            error = int(dx / 2.0)
+            ystep = 1 if y1 < y2 else -1
+            y = y1
+            points = []
+            for x in range(x1, x2 + 1):
+                coord = vector([y, x]) if is_steep else vector([x, y])
+                points.append(coord)
+                error -= abs(dy)
+                if error < 0:
+                    y += ystep
+                    error += dx
+            return points
+
+        if self.explored:
+            self.sprite.draw(surface, position)
+        else:
+            line_of_sight = bresenham(self.sprite.position, Game.PLAYER.position)[1:-1]
+            visible = all(map(lambda x: Game.MAP[x[0], x[1]].transparent, line_of_sight))
+            self.explored = visible
 
 
 class Sprite:
     SIZE = 40
-    FONT = pygame.font.SysFont('Monospace Regular', int(SIZE * 1.5))
+    SHADOW = 10
+    FONT = pygame.font.SysFont('Monospace Regular', int(SIZE * 1.4))
 
     def __init__(self, position, character, color=WHITE):
-        self.character = Sprite.FONT.render(character, True, color)
+        self.character = Sprite.FONT.render(character, False, color).convert()
         self.position = position
-        self.velocity = [0, 0]
+        self.velocity = vector([0, 0])
 
     def draw(self, surface, position):
-        blit_at = list(map(lambda x: x * Sprite.SIZE, position))
-        surface.blit(self.character, blit_at)
+        def dist(objA, objB):
+            x1, y1 = objA
+            x2, y2 = objB
+            return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
+        self.character.set_alpha(255 / (dist(Game.CENTER, position) / Sprite.SHADOW + 1) ** 2)
+        blit_at = position * Sprite.SIZE
+        rect = self.character.get_rect(center=blit_at + Sprite.SIZE // 2)
+        surface.blit(self.character, rect)
 
     def update(self):
         x, y = self.position
         dx, dy = self.velocity
         if not Game.MAP[x + dx, y + dy].solid:
-            self.position = [x + dx, y + dy]
+            self.position = self.position + self.velocity
 
 
 class Game:
-    WIDTH = 800
-    HEIGHT = 600
+    WIDTH = 1920
+    HEIGHT = 1080
+    BORDER_WIDTH = (WIDTH % Sprite.SIZE) // 2
+    BORDER_HEIGHT = (HEIGHT % Sprite.SIZE) // 2
+    SPRITE_WIDTH = WIDTH // Sprite.SIZE
+    SPRITE_HEIGHT = HEIGHT // Sprite.SIZE
+    CENTER = vector([SPRITE_WIDTH, SPRITE_HEIGHT]) // 2
     MAP = None
+    PLAYER = None
 
     def __init__(self):
-        self.main_surf = pygame.display.set_mode((Game.WIDTH, Game.HEIGHT))
-        self.map = Game.MAP = Map((100, 100))
-        self.player = Sprite(self.map.rooms[0].center(), '@')
+        self.main_surf = pygame.display.set_mode(
+            (Game.WIDTH, Game.HEIGHT), pygame.FULLSCREEN)
+        self.map = Game.MAP = Map(vector([100, 100]))
+        self.player = Game.PLAYER = Sprite(self.map.rooms[0].center(), '@')
 
     def draw(self):
         # clear
@@ -185,8 +267,7 @@ class Game:
         # draw background
         self.map.draw(self.main_surf, self.player.position)
         # draw foreground
-        self.player.draw(self.main_surf, [Game.WIDTH // Sprite.SIZE // 2,
-                                          Game.HEIGHT // Sprite.SIZE // 2])
+        self.player.draw(self.main_surf, Game.CENTER)
         # update
         pygame.display.flip()
 
@@ -198,10 +279,12 @@ class Game:
         for event in events:
             if event.type == pygame.QUIT:
                 self.running = False
+            if event.type == pygame.KEYDOWN and event.key in [K_ESCAPE, KMOD_LALT | K_F4]:
+                self.running = False
 
         keypresses = list(map(int, pygame.key.get_pressed()))
-        self.player.velocity[0] = keypresses[K_d] - keypresses[K_a]
-        self.player.velocity[1] = keypresses[K_s] - keypresses[K_w]
+        self.player.velocity = vector([keypresses[K_d] - keypresses[K_a],
+                                       keypresses[K_s] - keypresses[K_w]])
 
     def main_loop(self):
         self.running = True
@@ -212,6 +295,7 @@ class Game:
             self.eval_events()
             # update gamestate
             self.update()
+            # draw everything
             self.draw()
         # exit
         pygame.quit()
