@@ -4,57 +4,25 @@ from random import randrange
 
 import pygame
 from pygame.locals import *
+
+from vector import vector
+
 pygame.init()
 
 
 BLACK = (0, 0, 0)
-GREY = (150, 150, 150)
+GREY = (200, 200, 200)
 WHITE = (255, 255, 255)
-BROWN = (70, 35, 10)
+BROWN = (140, 70, 20)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 
 
-class vector(list):
-
-    def __or__(self, other):
-        return vector(list(self) + list(other))
-
-    def __add__(self, other):
-        if isinstance(other, vector):
-            return vector(map(lambda x, y: x + y, self, other))
-        else:
-            return vector(map(lambda x: x + other, self))
-
-    def __neg__(self):
-        return vector(map(lambda x: -x, self))
-
-    def __sub__(self, other):
-        return self + other.__neg__()
-
-    def __mul__(self, other):
-        if isinstance(other, vector):
-            return vector(map(lambda x, y: x * y, self, other))
-        else:
-            return vector(map(lambda x: x * other, self))
-
-    def __div__(self, other):
-        if isinstance(other, vector):
-            return vector(map(lambda x, y: x / y, self, other))
-        else:
-            return vector(map(lambda x: x / other, self))
-
-    def __floordiv__(self, other):
-        if isinstance(other, vector):
-            return vector(map(lambda x, y: x // y, self, other))
-        else:
-            return vector(map(lambda x: x // other, self))
-
-
 class Room:
     MIN_SIZE = 10
     MAX_SIZE = 15
+    MAX_MONSTER = 3
 
     def __init__(self, x, y, w, h):
         self.x1, self.x2 = x, x + w - 1
@@ -82,7 +50,7 @@ class Map:
         self.gen_map()
 
     def __getitem__(self, slices):
-        if isinstance(slices, tuple):
+        if isinstance(slices, tuple) or isinstance(slices, list):
             h, v = slices
         else:
             h, v = slices, slice(0, -1, 1)
@@ -158,29 +126,67 @@ class Map:
                         for y in range(self.size[1])]
         self.rooms = gen_rooms(int((self.size[0] * self.size[1]) ** 0.5))
         carve(self.rooms)
-        self.update()
+        self.build()
 
-    def update(self):
+    def build(self):
         self.map = [[Tile(vector([x, y]), *t) for x, t in enumerate(row)]
                     for y, row in enumerate(self.mapdata)]
 
-    def draw(self, surface, position):
-        x0, y0 = position
+    def update(self):
+        for row in self.map:
+            for cell in row:
+                cell.update()
+
+    def draw(self, surface):
+        x0, y0 = position = Game.INST.player.position
         xc, yc = position - Game.CENTER
-        for y, row in enumerate(self[xc:xc + Game.SPRITE_WIDTH, yc:yc + Game.SPRITE_HEIGHT]):
-            for x, cell in enumerate(row):
-                cell.draw(surface, vector([x, y]))
+        for row in self[xc:xc + Game.Object_WIDTH, yc:yc + Game.Object_HEIGHT]:
+            for cell in row:
+                cell.draw(surface)
+
+    def blocked(self, position):
+        if self[position].solid:
+            return True
+        if any([x.solid and x.position == position for x in Game.INST.objects]):
+            return True
 
 
-class Tile:
+class Object:
+    SIZE = 40
+    SHADOW = 10
+    FONT = pygame.font.SysFont('Monospace Regular', int(SIZE * 1.4))
 
-    def __init__(self, position, character, color=WHITE, solid=False, transparent=None):
-        self.sprite = Sprite(position, character, color)
+    def __init__(self, position, character, color=WHITE, solid=True, transparent=None):
+        self.character = Object.FONT.render(character, False, color).convert()
+        self.position = position
         self.solid = solid
         self.transparent = not solid if transparent is None else transparent
+        self.velocity = vector([0, 0])
+
+    def draw(self, surface):
+        def dist(objA, objB):
+            x1, y1 = objA
+            x2, y2 = objB
+            return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
+        position = self.position - Game.INST.player.position
+        alpha = 255 / (dist((0, 0), position) / Object.SHADOW + 1) ** 2
+        self.character.set_alpha(alpha)
+        blit_at = (position + Game.CENTER) * Object.SIZE
+        rect = self.character.get_rect(center=blit_at + Object.SIZE // 2)
+        surface.blit(self.character, rect)
+
+    def update(self):
+        if not Game.INST.map.blocked(self.position + self.velocity):
+            self.position = self.position + self.velocity
+
+
+class Tile(Object):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.explored = False
 
-    def draw(self, surface, position):
+    def draw(self, surface):
         def bresenham(start, end):
             x1, y1 = start
             x2, y2 = end
@@ -210,69 +216,70 @@ class Tile:
             return points
 
         if self.explored:
-            self.sprite.draw(surface, position)
+            super().draw(surface)
         else:
-            line_of_sight = bresenham(self.sprite.position, Game.PLAYER.position)[1:-1]
-            visible = all(map(lambda x: Game.MAP[x[0], x[1]].transparent, line_of_sight))
+            line_of_sight = bresenham(self.position,
+                                      Game.INST.player.position)[1:-1]
+            visible = all([Game.INST.map[x].transparent
+                           for x in line_of_sight])
             self.explored = visible
 
 
-class Sprite:
-    SIZE = 40
-    SHADOW = 10
-    FONT = pygame.font.SysFont('Monospace Regular', int(SIZE * 1.4))
+class Troll(Object):
 
-    def __init__(self, position, character, color=WHITE):
-        self.character = Sprite.FONT.render(character, False, color).convert()
-        self.position = position
-        self.velocity = vector([0, 0])
-
-    def draw(self, surface, position):
-        def dist(objA, objB):
-            x1, y1 = objA
-            x2, y2 = objB
-            return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
-        self.character.set_alpha(255 / (dist(Game.CENTER, position) / Sprite.SHADOW + 1) ** 2)
-        blit_at = position * Sprite.SIZE
-        rect = self.character.get_rect(center=blit_at + Sprite.SIZE // 2)
-        surface.blit(self.character, rect)
+    def __init__(self, position, color=GREEN, **kwargs):
+        super().__init__(position, 'T', color=color, **kwargs)
 
     def update(self):
-        x, y = self.position
-        dx, dy = self.velocity
-        if not Game.MAP[x + dx, y + dy].solid:
-            self.position = self.position + self.velocity
+        if randrange(3) == 0:
+            self.velocity = vector([randrange(-1, 2) for _ in range(2)])
+        else:
+            self.velocity = vector([0, 0])
+        super().update()
+
+
+class Player(Object):
+
+    def __init__(self, position, **kwargs):
+        super().__init__(position, '@', **kwargs)
+
+    def update(self):
+        keypresses = list(map(int, pygame.key.get_pressed()))
+        self.velocity = vector([keypresses[K_d] - keypresses[K_a],
+                                keypresses[K_s] - keypresses[K_w]])
+        super().update()
 
 
 class Game:
-    WIDTH = 1920
-    HEIGHT = 1080
-    BORDER_WIDTH = (WIDTH % Sprite.SIZE) // 2
-    BORDER_HEIGHT = (HEIGHT % Sprite.SIZE) // 2
-    SPRITE_WIDTH = WIDTH // Sprite.SIZE
-    SPRITE_HEIGHT = HEIGHT // Sprite.SIZE
-    CENTER = vector([SPRITE_WIDTH, SPRITE_HEIGHT]) // 2
-    MAP = None
-    PLAYER = None
+    PIXEL_WIDTH = 1920
+    PIXEL_HEIGHT = 1080
+    BORDER_WIDTH = (PIXEL_WIDTH % Object.SIZE) // 2
+    BORDER_HEIGHT = (PIXEL_HEIGHT % Object.SIZE) // 2
+    Object_WIDTH = PIXEL_WIDTH // Object.SIZE
+    Object_HEIGHT = PIXEL_HEIGHT // Object.SIZE
+    CENTER = vector([Object_WIDTH, Object_HEIGHT]) // 2
+    INST = None
 
     def __init__(self):
-        self.main_surf = pygame.display.set_mode(
-            (Game.WIDTH, Game.HEIGHT), pygame.FULLSCREEN)
-        self.map = Game.MAP = Map(vector([100, 100]))
-        self.player = Game.PLAYER = Sprite(self.map.rooms[0].center(), '@')
+        self.main_surf = pygame.display.set_mode((Game.PIXEL_WIDTH, Game.PIXEL_HEIGHT),
+                                                 pygame.FULLSCREEN)
+        self.map = Map(vector([100, 100]))
+        self.player = Player(self.map.rooms[0].center())
+        self.objects = [self.player] + [Troll(r.center()) for r in self.map.rooms[1:]]
+        Game.INST = self
 
     def draw(self):
-        # clear
         self.main_surf.fill(BLACK)
-        # draw background
-        self.map.draw(self.main_surf, self.player.position)
-        # draw foreground
-        self.player.draw(self.main_surf, Game.CENTER)
-        # update
+        self.map.draw(self.main_surf)
+        for obj in self.objects:
+            obj.draw(self.main_surf)
+        self.player.draw(self.main_surf)
         pygame.display.flip()
 
     def update(self):
-        self.player.update()
+        # self.map.update()
+        for obj in self.objects:
+            obj.update()
 
     def eval_events(self):
         events = pygame.event.get()
@@ -282,15 +289,11 @@ class Game:
             if event.type == pygame.KEYDOWN and event.key in [K_ESCAPE, KMOD_LALT | K_F4]:
                 self.running = False
 
-        keypresses = list(map(int, pygame.key.get_pressed()))
-        self.player.velocity = vector([keypresses[K_d] - keypresses[K_a],
-                                       keypresses[K_s] - keypresses[K_w]])
-
     def main_loop(self):
         self.running = True
         fps = pygame.time.Clock()
         while self.running:
-            fps.tick(10)
+            fps.tick(8)
             # eval event
             self.eval_events()
             # update gamestate
