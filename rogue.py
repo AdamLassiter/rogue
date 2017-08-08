@@ -1,6 +1,5 @@
-#! /usr/bin/python3
-
 from random import randrange
+from typing import *
 
 import pygame
 from pygame.locals import *
@@ -11,9 +10,9 @@ pygame.init()
 
 
 BLACK = (0, 0, 0)
-GREY = (200, 200, 200)
+GREY = (150, 150, 150)
 WHITE = (255, 255, 255)
-BROWN = (140, 70, 20)
+BROWN = (210, 120, 30)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
@@ -24,34 +23,34 @@ class Room:
     MAX_SIZE = 15
     MAX_MONSTER = 3
 
-    def __init__(self, x, y, w, h):
+    def __init__(self, x: int, y: int, w: int, h: int) -> None:
         self.x1, self.x2 = x, x + w - 1
         self.y1, self.y2 = y, y + h - 1
 
-    def __contains__(self, point):
+    def __contains__(self, point: vector) -> bool:
         x, y = point
         return self.x1 <= x <= self.x2 and self.y1 <= y <= self.y2
 
-    def __str__(self):
+    def __str__(self) -> str:
         return '(%s %s %s %s)' % (self.x1, self.x2, self.y1, self.y2)
 
-    def center(self):
+    def center(self) -> vector:
         return vector([self.x1 + self.x2, self.y1 + self.y2]) // 2
 
-    def overlaps(self, other):
+    def overlaps(self, other) -> bool:
         return (self.x1 <= other.x2 and self.x2 >= other.x1 and
                 self.y1 <= other.y2 and self.y2 >= other.y1)
 
 
 class Map:
 
-    def __init__(self, size):
+    def __init__(self, size: vector) -> None:
         self.size = size
         self.gen_map()
 
-    def __getitem__(self, slices):
-        if isinstance(slices, tuple) or isinstance(slices, list):
-            h, v = slices
+    def __getitem__(self, slices: Union[slice, Iterable]):
+        if isinstance(slices, list) or isinstance(slices, tuple):
+            h, v = slices[0], slices[1]
         else:
             h, v = slices, slice(0, -1, 1)
         return_slice = isinstance(h, slice) or isinstance(v, slice)
@@ -69,7 +68,7 @@ class Map:
             return self[h, vd[0] % vl:vl:vd[2]] + self[h, 0:vd[1] % vl:vd[2]]
         return [row[h] for row in self.map[v]] if return_slice else self.map[vd[0]][hd[0]]
 
-    def __setitem__(self, slices, val):
+    def __setitem__(self, slices, val: tuple):
         if isinstance(slices, tuple):
             h, v = slices
         else:
@@ -77,8 +76,8 @@ class Map:
         self.mapdata[v][h] = val
 
     def gen_map(self):
-        def gen_rooms(attempts):
-            rooms = []
+        def gen_rooms(attempts: int) -> List[Room]:
+            rooms: List[Room] = []
             for _ in range(attempts):
                 width = randrange(Room.MIN_SIZE, Room.MAX_SIZE, 2)
                 height = randrange(Room.MIN_SIZE, Room.MAX_SIZE, 2)
@@ -91,17 +90,17 @@ class Map:
                     rooms.append(room)
             return rooms
 
-        def carve_room(room):
+        def carve_room(room: Room):
             for x in range(room.x1, room.x2 + 1):
                 for y in range(room.y1, room.y2 + 1):
                     self[x, y] = ['.', BROWN, False]
 
-        def carve_tunnel(from_room, to_room):
+        def carve_tunnel(from_room: Room, to_room: Room):
             def horizontal_tunnel(from_x, to_x, y):
                 x0, x1 = min((from_x, to_x)), max((from_x, to_x))
                 carve_room(Room(x0, y, x1 - x0 + 1, 1))
 
-            def vertical_tunnel(from_y, to_y, x):
+            def vertical_tunnel(from_y: int, to_y: int, x: int):
                 y0, y1 = min((from_y, to_y)), max((from_y, to_y))
                 carve_room(Room(x, y0, 1, y1 - y0 + 1))
 
@@ -114,7 +113,7 @@ class Map:
                 vertical_tunnel(from_y, to_y, from_x)
                 horizontal_tunnel(from_x, to_x, to_y)
 
-        def carve(rooms):
+        def carve(rooms: Iterable[Room]):
             last_room = None
             for room in rooms:
                 if last_room:
@@ -137,14 +136,14 @@ class Map:
             for cell in row:
                 cell.update()
 
-    def draw(self, surface):
+    def draw(self, surface: pygame.Surface):
         x0, y0 = position = Game.INST.player.position
         xc, yc = position - Game.CENTER
-        for row in self[xc:xc + Game.Object_WIDTH, yc:yc + Game.Object_HEIGHT]:
+        for row in self[xc:xc + Game.SPRITE_WIDTH, yc:yc + Game.SPRITE_HEIGHT]:
             for cell in row:
                 cell.draw(surface)
 
-    def blocked(self, position):
+    def blocked(self, position: vector) -> bool:
         if self[position].solid:
             return True
         if any([x.solid and x.position == position for x in Game.INST.objects]):
@@ -156,15 +155,16 @@ class Object:
     SHADOW = 10
     FONT = pygame.font.SysFont('Monospace Regular', int(SIZE * 1.4))
 
-    def __init__(self, position, character, color=WHITE, solid=True, transparent=None):
+    def __init__(self, position: vector, character: str, color: Iterable[int] = WHITE,
+                 solid: bool = True, transparent: bool = None) -> None:
         self.character = Object.FONT.render(character, False, color).convert()
         self.position = position
         self.solid = solid
         self.transparent = not solid if transparent is None else transparent
         self.velocity = vector([0, 0])
 
-    def draw(self, surface):
-        def dist(objA, objB):
+    def draw(self, surface: pygame.Surface):
+        def dist(objA: tuple, objB: tuple) -> float:
             x1, y1 = objA
             x2, y2 = objB
             return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
@@ -175,19 +175,8 @@ class Object:
         rect = self.character.get_rect(center=blit_at + Object.SIZE // 2)
         surface.blit(self.character, rect)
 
-    def update(self):
-        if not Game.INST.map.blocked(self.position + self.velocity):
-            self.position = self.position + self.velocity
-
-
-class Tile(Object):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.explored = False
-
-    def draw(self, surface):
-        def bresenham(start, end):
+    def visible(self, other) -> bool:
+        def bresenham(start: vector, end: vector):
             x1, y1 = start
             x2, y2 = end
             dx = x2 - x1
@@ -214,21 +203,35 @@ class Tile(Object):
                     y += ystep
                     error += dx
             return points
+        line_of_sight = bresenham(self.position, other.position)[1:-1]
+        return all([Game.INST.map[x].transparent for x in line_of_sight])
 
+    def update(self):
+        if not Game.INST.map.blocked(self.position + self.velocity):
+            self.position = self.position + self.velocity
+
+
+class Tile(Object):
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.explored = False
+
+    def draw(self, surface: pygame.Surface):
         if self.explored:
             super().draw(surface)
         else:
-            line_of_sight = bresenham(self.position,
-                                      Game.INST.player.position)[1:-1]
-            visible = all([Game.INST.map[x].transparent
-                           for x in line_of_sight])
-            self.explored = visible
+            self.explored = self.visible(Game.INST.player)
 
 
 class Troll(Object):
 
-    def __init__(self, position, color=GREEN, **kwargs):
+    def __init__(self, position: vector, color: tuple = GREEN, **kwargs) -> None:
         super().__init__(position, 'T', color=color, **kwargs)
+
+    def draw(self, surface: pygame.Surface):
+        if self.visible(Game.INST.player):
+            super().draw(surface)
 
     def update(self):
         if randrange(3) == 0:
@@ -240,7 +243,7 @@ class Troll(Object):
 
 class Player(Object):
 
-    def __init__(self, position, **kwargs):
+    def __init__(self, position: vector, **kwargs) -> None:
         super().__init__(position, '@', **kwargs)
 
     def update(self):
@@ -255,17 +258,17 @@ class Game:
     PIXEL_HEIGHT = 1080
     BORDER_WIDTH = (PIXEL_WIDTH % Object.SIZE) // 2
     BORDER_HEIGHT = (PIXEL_HEIGHT % Object.SIZE) // 2
-    Object_WIDTH = PIXEL_WIDTH // Object.SIZE
-    Object_HEIGHT = PIXEL_HEIGHT // Object.SIZE
-    CENTER = vector([Object_WIDTH, Object_HEIGHT]) // 2
+    SPRITE_WIDTH = PIXEL_WIDTH // Object.SIZE
+    SPRITE_HEIGHT = PIXEL_HEIGHT // Object.SIZE
+    CENTER = vector([SPRITE_WIDTH, SPRITE_HEIGHT]) // 2
     INST = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.main_surf = pygame.display.set_mode((Game.PIXEL_WIDTH, Game.PIXEL_HEIGHT),
                                                  pygame.FULLSCREEN)
         self.map = Map(vector([100, 100]))
         self.player = Player(self.map.rooms[0].center())
-        self.objects = [self.player] + [Troll(r.center()) for r in self.map.rooms[1:]]
+        self.objects = cast(List[Object], [self.player]) + cast(List[Object], [Troll(r.center()) for r in self.map.rooms[1:]])
         Game.INST = self
 
     def draw(self):
@@ -285,14 +288,15 @@ class Game:
         events = pygame.event.get()
         for event in events:
             if event.type == pygame.QUIT:
-                self.running = False
-            if event.type == pygame.KEYDOWN and event.key in [K_ESCAPE, KMOD_LALT | K_F4]:
-                self.running = False
+                self.state = 'quit'
+            if event.type == pygame.KEYDOWN:
+                if event.key in [K_ESCAPE, KMOD_LALT | K_F4]:
+                    self.state = 'quit'
 
     def main_loop(self):
-        self.running = True
+        self.state = 'play'
         fps = pygame.time.Clock()
-        while self.running:
+        while self.state == 'play':
             fps.tick(8)
             # eval event
             self.eval_events()
@@ -305,6 +309,10 @@ class Game:
         exit()
 
 
-if __name__ == '__main__':
+def main():
     g = Game()
     g.main_loop()
+
+
+if __name__ == '__main__':
+    main()
