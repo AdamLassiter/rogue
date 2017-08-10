@@ -51,18 +51,21 @@ class Map:
         hl = len(self.map[0])
         vl = len(self.map)
         if hd[0] < 0 or hd[1] > hl:
-            return [a + b for a, b in zip(self[hd[0] % hl:hl:hd[2], v],
-                                          self[0:hd[1] % hl:hd[2], v])]
+            return MapSlice(self.player, [a + b for a, b in zip(self[hd[0] % hl:hl:hd[2], v],
+                                                                self[0:hd[1] % hl:hd[2], v])])
         if vd[0] < 0 or vd[1] > vl:
-            return self[h, vd[0] % vl:vl:vd[2]] + self[h, 0:vd[1] % vl:vd[2]]
-        return [row[h] for row in self.map[v]] if return_slice else self.map[vd[0]][hd[0]]
+            return MapSlice(self.player, self[h, vd[0] % vl:vl:vd[2]] + self[h, 0:vd[1] % vl:vd[2]])
+        return MapSlice(self.player, [row[h] for row in self.map[v]]) if return_slice else self.map[vd[0]][hd[0]]
 
-    def __setitem__(self, slices, val: tuple):
-        if isinstance(slices, tuple):
-            h, v = slices
+    def __setitem__(self, slices: Union[slice, Iterable], val: Union[Iterable, Tile]):
+        if isinstance(slices, list) or isinstance(slices, tuple):
+            h, v = slices[0], slices[1]
         else:
             h, v = slices, slice(None, None, None)
-        self.mapdata[v][h] = val
+        if isinstance(val, Tile):
+            self.map[v][h] = val
+        else:
+            self.mapdata[v][h] = val
 
     def gen_map(self):
         def gen_rooms(attempts: int) -> List[Room]:
@@ -121,26 +124,42 @@ class Map:
     def populate(self):
         self.objects: List[Object] = []
         self.objects.extend([Troll(self.player, self, r.center()) for r in self.rooms[1:-1]])
-        self.objects.append(Ladder(self.player, self, self.rooms[-1].center(), solid=False))
+        self[self.rooms[-1].center()] = Ladder(self.player, self, self.rooms[-1].center(), solid=False)
 
     def build(self):
         self.map = [[Tile(self.player, self, vector([x, y]), *t) for x, t in enumerate(row)]
                     for y, row in enumerate(self.mapdata)]
 
-    def update(self):
-        for row in self.map:
-            for cell in row:
-                cell.update()
-
     def draw(self, surface: pygame.Surface):
         x0, y0 = position = self.player.position
         xc, yc = position - GAME_CENTER
-        for row in self[xc:xc + GAME_SPRITE_WIDTH, yc:yc + GAME_SPRITE_HEIGHT]:
-            for cell in row:
-                cell.draw(surface)
+        self[xc:xc + GAME_SPRITE_WIDTH, yc:yc + GAME_SPRITE_HEIGHT].draw(surface)
+
+    def update(self):
+        x0, y0 = position = self.player.position
+        xc, yc = position - GAME_CENTER
+        self[xc:xc + GAME_SPRITE_WIDTH, yc:yc + GAME_SPRITE_HEIGHT].update()
 
     def blocked(self, position: vector) -> bool:
         if self[position].solid:
             return True
         if any([x.solid and x.position == position for x in self.objects]):
             return True
+
+
+class MapSlice(list):
+
+    def __init__(self, player_ref, map_slice) -> None:
+        self.player = player_ref
+        self.size = vector([len(map_slice[0]), len(map_slice)])
+        super().__init__(map_slice)
+
+    def draw(self, surface: pygame.Surface):
+        for row in self:
+            for cell in row:
+                cell.draw(surface)
+
+    def update(self):
+        for row in self:
+            for cell in row:
+                cell.update()

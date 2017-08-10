@@ -5,6 +5,7 @@ from pygame.locals import *
 pygame.init()
 
 from constants import *
+from hud import Hud
 from map import Map, Room
 from objects import Player
 from vector import vector
@@ -15,10 +16,11 @@ class Game:
     def __init__(self) -> None:
         self.main_surf = pygame.display.set_mode((GAME_PIXEL_WIDTH, GAME_PIXEL_HEIGHT),
                                                  pygame.FULLSCREEN)
-        self.player = Player(None, None, None, stats=(10, 10, 10))
+        self.player = Player(None, None, None)
         self.map = Map(self.player, vector([100, 100]))
-        Player.__init__(self.player, self.player, self.map, self.map.rooms[0].center())
-        self.map.objects.append(self.player)
+        self.hud = Hud(self.player)
+        Player.__init__(self.player, self.player, self.map, self.map.rooms[0].center(), stats=(10, 10, 10))
+        self.map.objects.extend([self.player, self.hud])
 
     def draw(self):
         self.main_surf.fill(BLACK)
@@ -29,7 +31,7 @@ class Game:
         pygame.display.flip()
 
     def update(self):
-        # self.map.update()
+        self.map.update()
         for obj in self.map.objects:
             obj.update()
 
@@ -42,7 +44,8 @@ class Game:
                 if event.key in [K_ESCAPE, KMOD_LALT | K_F4]:
                     self.state = 'quit'
             if event.type == LADDER_EVENT:
-                self.state = 'quit'
+                self.player.hp -= 1
+                # self.state = 'quit'
 
     def main_loop(self):
         self.state = 'play'

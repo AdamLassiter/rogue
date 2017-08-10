@@ -10,10 +10,10 @@ from vector import vector
 
 
 class Object:
-    FONT = pygame.font.SysFont('Monospace Regular', int(OBJECT_SIZE * 1.4))
+    FONT = pygame.font.Font('./DejaVuSansMono.ttf', int(OBJECT_SIZE * 1.1))
 
     def __init__(self, player_ref, map_ref, position: vector, character: str = '',
-                 color: Iterable[int] = WHITE, solid: bool = True,
+                 color: tuple = WHITE, solid: bool = True,
                  transparent: bool = None) -> None:
         self.player = player_ref
         self.map = map_ref
@@ -107,6 +107,7 @@ class Troll(Object):
 
     def __init__(self, *args, character: str = 'T', color: tuple = GREEN, **kwargs) -> None:
         kwargs.update({'character': character, 'color': color})
+        self.move_counter = 0
         super().__init__(*args, **kwargs)
 
     def draw(self, surface: pygame.Surface):
@@ -114,7 +115,13 @@ class Troll(Object):
             super().draw(surface)
 
     def update(self):
-        if randrange(3) == 0:
+        self.move_counter += 1
+        self.move_counter %= 2
+        if self.visible(self.player.position) and self.move_counter:
+            d_pos = self.player.position - self.position
+            distance = sum(map(lambda x: x ** 2, d_pos)) ** 0.5
+            self.velocity = vector(map(lambda x: int(round(x / distance)), d_pos))
+        elif self.move_counter:
             self.velocity = vector([randrange(-1, 2) for _ in range(2)])
         else:
             self.velocity = vector([0, 0])

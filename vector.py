@@ -27,7 +27,7 @@ class vector(list):
         else:
             return vector(map(lambda x: x * other, self))
 
-    def __div__(self, other):
+    def __truediv__(self, other):
         if isinstance(other, vector):
             return vector(map(lambda x, y: x / y, self, other))
         else:
