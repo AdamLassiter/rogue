@@ -1,3 +1,5 @@
+#! /usr/bin/python3
+
 class vector(list):
 
     def __or__(self, other):

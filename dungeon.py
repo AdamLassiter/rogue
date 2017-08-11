@@ -1,3 +1,5 @@
+#! /usr/bin/python3
+
 from random import randrange
 from typing import *
 
@@ -69,7 +71,7 @@ class Map:
 
     def gen_map(self):
         def gen_rooms(attempts: int) -> List[Room]:
-            rooms: List[Room] = []
+            rooms = []
             for _ in range(attempts):
                 width = randrange(ROOM_MIN_SIZE, ROOM_MAX_SIZE, 2)
                 height = randrange(ROOM_MIN_SIZE, ROOM_MAX_SIZE, 2)
@@ -122,7 +124,7 @@ class Map:
         self.populate()
 
     def populate(self):
-        self.objects: List[Object] = []
+        self.objects = []
         self.objects.extend([Troll(self.player, self, r.center()) for r in self.rooms[1:-1]])
         self[self.rooms[-1].center()] = Ladder(self.player, self, self.rooms[-1].center(), solid=False)
 

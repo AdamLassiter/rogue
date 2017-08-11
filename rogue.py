@@ -1,15 +1,17 @@
+#! /usr/bin/python3
+
 from typing import *
 
 import pygame
 from pygame.locals import *
-pygame.init()
 
 from constants import *
 from hud import Hud
-from map import Map, Room
+from dungeon import Map, Room
 from objects import Player
 from vector import vector
 
+pygame.init()
 
 class Game:
 
@@ -19,7 +21,8 @@ class Game:
         self.player = Player(None, None, None)
         self.map = Map(self.player, vector([100, 100]))
         self.hud = Hud(self.player)
-        Player.__init__(self.player, self.player, self.map, self.map.rooms[0].center(), stats=(10, 10, 10))
+        Player.__init__(self.player, self.player, self.map, self.map.rooms[0].center(),
+                        stats=(10, 10, 10))
         self.map.objects.extend([self.player, self.hud])
 
     def draw(self):
@@ -64,8 +67,8 @@ class Game:
 
 
 def main():
-    g = Game()
-    g.main_loop()
+    game = Game()
+    game.main_loop()
 
 
 if __name__ == '__main__':

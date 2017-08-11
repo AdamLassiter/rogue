@@ -1,3 +1,5 @@
+#! /usr/bin/python3
+
 from random import randrange
 from typing import *
 
