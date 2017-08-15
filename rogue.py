@@ -8,10 +8,11 @@ from pygame.locals import *
 from constants import *
 from hud import Hud
 from dungeon import Map, Room
-from objects import Player
+from fighters import Player
 from vector import vector
 
 pygame.init()
+
 
 class Game:
 
@@ -23,20 +24,17 @@ class Game:
         self.hud = Hud(self.player)
         Player.__init__(self.player, self.player, self.map, self.map.rooms[0].center(),
                         stats=(10, 10, 10))
-        self.map.objects.extend([self.player, self.hud])
+        self.map.objects.append(self.player)
 
     def draw(self):
         self.main_surf.fill(BLACK)
         self.map.draw(self.main_surf)
-        for obj in self.map.objects:
-            obj.draw(self.main_surf)
-        self.player.draw(self.main_surf)
+        self.hud.draw(self.main_surf)
         pygame.display.flip()
 
     def update(self):
         self.map.update()
-        for obj in self.map.objects:
-            obj.update()
+        self.hud.update()
 
     def eval_events(self):
         events = pygame.event.get()
@@ -47,8 +45,9 @@ class Game:
                 if event.key in [K_ESCAPE, KMOD_LALT | K_F4]:
                     self.state = 'quit'
             if event.type == LADDER_EVENT:
-                self.player.hp -= 1
+                # self.player.inventory.append(('H', YELLOW))
                 # self.state = 'quit'
+                pass
 
     def main_loop(self):
         self.state = 'play'

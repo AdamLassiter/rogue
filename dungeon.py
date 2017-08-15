@@ -3,12 +3,13 @@
 from random import randrange
 from typing import *
 
+from constants import *
+from tiles import Tile, Ladder
+from fighters import Troll
+from vector import vector
+
 import pygame
 pygame.init()
-
-from constants import *
-from objects import Tile, Troll, Ladder
-from vector import vector
 
 
 class Room:
@@ -37,10 +38,11 @@ class Map:
     def __init__(self, player_ref, size: vector) -> None:
         self.player = player_ref
         self.size = size
+        self.objects = []
         self.gen_map()
 
     def __getitem__(self, slices: Union[slice, Iterable]):
-        if isinstance(slices, list) or isinstance(slices, tuple):
+        if isinstance(slices, (list, tuple)):
             h, v = slices[0], slices[1]
         else:
             h, v = slices, slice(0, -1, 1)
@@ -56,11 +58,15 @@ class Map:
             return MapSlice(self.player, [a + b for a, b in zip(self[hd[0] % hl:hl:hd[2], v],
                                                                 self[0:hd[1] % hl:hd[2], v])])
         if vd[0] < 0 or vd[1] > vl:
-            return MapSlice(self.player, self[h, vd[0] % vl:vl:vd[2]] + self[h, 0:vd[1] % vl:vd[2]])
-        return MapSlice(self.player, [row[h] for row in self.map[v]]) if return_slice else self.map[vd[0]][hd[0]]
+            ret = self[h, vd[0] % vl:vl:vd[2]] + self[h, 0:vd[1] % vl:vd[2]]
+        else:
+            if not return_slice:
+                return self.map[vd[0]][hd[0]]
+            ret = [row[h] for row in self.map[v]]
+        return MapSlice(self.player, ret)
 
     def __setitem__(self, slices: Union[slice, Iterable], val: Union[Iterable, Tile]):
-        if isinstance(slices, list) or isinstance(slices, tuple):
+        if isinstance(slices, (list, tuple)):
             h, v = slices[0], slices[1]
         else:
             h, v = slices, slice(None, None, None)
@@ -124,9 +130,9 @@ class Map:
         self.populate()
 
     def populate(self):
-        self.objects = []
         self.objects.extend([Troll(self.player, self, r.center()) for r in self.rooms[1:-1]])
-        self[self.rooms[-1].center()] = Ladder(self.player, self, self.rooms[-1].center(), solid=False)
+        self[self.rooms[-1].center()] = Ladder(self.player, self,
+                                               self.rooms[-1].center())
 
     def build(self):
         self.map = [[Tile(self.player, self, vector([x, y]), *t) for x, t in enumerate(row)]
@@ -136,11 +142,15 @@ class Map:
         x0, y0 = position = self.player.position
         xc, yc = position - GAME_CENTER
         self[xc:xc + GAME_SPRITE_WIDTH, yc:yc + GAME_SPRITE_HEIGHT].draw(surface)
+        for obj in self.objects:
+            obj.draw(surface)
 
     def update(self):
         x0, y0 = position = self.player.position
         xc, yc = position - GAME_CENTER
         self[xc:xc + GAME_SPRITE_WIDTH, yc:yc + GAME_SPRITE_HEIGHT].update()
+        for obj in self.objects:
+            obj.update()
 
     def blocked(self, position: vector) -> bool:
         if self[position].solid:

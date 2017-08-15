@@ -8,14 +8,15 @@ class vector(list):
     def __eq__(self, other):
         if isinstance(other, vector):
             return all(map(lambda x, y: x == y, self, other))
-        else:
-            return False
+        return False
 
     def __add__(self, other):
         if isinstance(other, vector):
             return vector(map(lambda x, y: x + y, self, other))
-        else:
-            return vector(map(lambda x: x + other, self))
+        return vector(map(lambda x: x + other, self))
+
+    def __iadd__(self, other):
+        return self + other
 
     def __neg__(self):
         return vector(map(lambda x: -x, self))
@@ -26,17 +27,14 @@ class vector(list):
     def __mul__(self, other):
         if isinstance(other, vector):
             return vector(map(lambda x, y: x * y, self, other))
-        else:
-            return vector(map(lambda x: x * other, self))
+        return vector(map(lambda x: x * other, self))
 
     def __truediv__(self, other):
         if isinstance(other, vector):
             return vector(map(lambda x, y: x / y, self, other))
-        else:
-            return vector(map(lambda x: x / other, self))
+        return vector(map(lambda x: x / other, self))
 
     def __floordiv__(self, other):
         if isinstance(other, vector):
             return vector(map(lambda x, y: x // y, self, other))
-        else:
-            return vector(map(lambda x: x // other, self))
+        return vector(map(lambda x: x // other, self))
