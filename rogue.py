@@ -1,7 +1,5 @@
 #! /usr/bin/python3
 
-from typing import *
-
 import pygame
 from pygame.locals import *
 
@@ -21,10 +19,9 @@ class Game:
                                                  pygame.FULLSCREEN)
         self.player = Player(None, None, None)
         self.map = Map(self.player, vector([100, 100]))
+        self.map.gen_map()
+        Player.__init__(self.player, self.player, self.map, self.map.rooms[0].center())
         self.hud = Hud(self.player)
-        Player.__init__(self.player, self.player, self.map, self.map.rooms[0].center(),
-                        stats=(10, 10, 10))
-        self.map.objects.append(self.player)
 
     def draw(self):
         self.main_surf.fill(BLACK)
@@ -41,13 +38,15 @@ class Game:
         for event in events:
             if event.type == pygame.QUIT:
                 self.state = 'quit'
-            if event.type == pygame.KEYDOWN:
+            elif event.type == pygame.KEYDOWN:
                 if event.key in [K_ESCAPE, KMOD_LALT | K_F4]:
                     self.state = 'quit'
-            if event.type == LADDER_EVENT:
+            elif event.type == LADDER_EVENT:
                 # self.player.inventory.append(('H', YELLOW))
                 # self.state = 'quit'
                 pass
+            elif event.type == PLAYER_KILL:
+                self.state = 'quit'
 
     def main_loop(self):
         self.state = 'play'

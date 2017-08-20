@@ -1,3 +1,5 @@
+#! /usr/bin/python3
+
 from pygame import USEREVENT
 
 from vector import vector
@@ -10,6 +12,7 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 YELLOW = (200, 200, 0)
+PURPLE = (200, 0, 200)
 
 ROOM_MIN_SIZE = 10
 ROOM_MAX_SIZE = 15

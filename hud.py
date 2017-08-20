@@ -1,7 +1,5 @@
 #! /usr/bin/python3
 
-from typing import *
-
 import pygame
 
 from constants import *
@@ -14,8 +12,7 @@ pygame.init()
 class Label:
     FONT = Object.FONT
 
-    def __init__(self, position: vector, label: str, value: Callable[[], str],
-                 color: tuple = WHITE) -> None:
+    def __init__(self, position: vector, label: str, value, color: tuple = WHITE) -> None:
         self.position = position
         self.label = label
         self.value = value
@@ -34,7 +31,7 @@ class Label:
 class Inventory:
     FONT = Object.FONT
 
-    def __init__(self, player_ref, position):
+    def __init__(self, player_ref, position: vector):
         self.player = player_ref
         self.position = position
         self.items = [x for x in player_ref.inventory]
@@ -56,8 +53,9 @@ class Hud(Object):
         self.position = p = vector([0, 0])
         self.labels = [Label(p + vector([0, 0]), ' HP', lambda: str(pr.hp)),
                        Label(p + vector([0, 1]), 'ATK', lambda: str(pr.attack)),
-                       Label(p + vector([0, 2]), 'DEF', lambda: str(pr.defense))]
-        self.inventory = Inventory(player_ref, p + vector([0, 4]))
+                       Label(p + vector([0, 2]), 'DEF', lambda: str(pr.defense)),
+                       Label(p + vector([0, 3]), 'SPD', lambda: str(pr.speed))]
+        self.inventory = Inventory(player_ref, p + vector([0, 5]))
         self.solid = False
 
     def draw(self, surface: pygame.Surface):

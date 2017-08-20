@@ -1,7 +1,6 @@
 #! /usr/bin/python3
 
 from random import randrange
-from typing import *
 
 import pygame
 from pygame.locals import *
@@ -12,8 +11,8 @@ from vector import vector
 pygame.init()
 
 
-class Object:
-    FONT = pygame.font.Font('./DejaVuSansMono.ttf', int(OBJECT_SIZE * 1.1))
+class Object(object):
+    FONT = pygame.font.Font('./DejaVuSansMono.ttf', OBJECT_SIZE)
 
     def __init__(self, player_ref, map_ref, position: vector, character: str = '',
                  color: tuple = WHITE, solid: bool = True, transparent: bool = None) -> None:
@@ -39,39 +38,41 @@ class Object:
         rect = self.character.get_rect(center=blit_at + OBJECT_SIZE // 2)
         surface.blit(self.character, rect)
 
+    @staticmethod
+    def bresenham(start: vector, end: vector):
+        try:
+            x1, y1 = start
+        except Exception as e:
+            print(start)
+            raise e
+        x2, y2 = end
+        dx = x2 - x1
+        dy = y2 - y1
+        is_steep = abs(dy) > abs(dx)
+        if is_steep:
+            x1, y1 = y1, x1
+            x2, y2 = y2, x2
+        swapped = x1 > x2
+        if swapped:
+            x1, x2 = x2, x1
+            y1, y2 = y2, y1
+        dx = x2 - x1
+        dy = y2 - y1
+        error = int(dx / 2.0)
+        ystep = 1 if y1 < y2 else -1
+        y = y1
+        points = []
+        for x in range(x1, x2 + 1):
+            coord = vector([y, x]) if is_steep else vector([x, y])
+            points.append(coord)
+            error -= abs(dy)
+            if error < 0:
+                y += ystep
+                error += dx
+        return list(reversed(points)) if swapped else points
+
     def visible(self, other_position: vector) -> int:
-        def bresenham(start: vector, end: vector):
-            try:
-                x1, y1 = start
-            except Exception as e:
-                print(start)
-                raise e
-            x2, y2 = end
-            dx = x2 - x1
-            dy = y2 - y1
-            is_steep = abs(dy) > abs(dx)
-            if is_steep:
-                x1, y1 = y1, x1
-                x2, y2 = y2, x2
-            swapped = x1 > x2
-            if swapped:
-                x1, x2 = x2, x1
-                y1, y2 = y2, y1
-            dx = x2 - x1
-            dy = y2 - y1
-            error = int(dx / 2.0)
-            ystep = 1 if y1 < y2 else -1
-            y = y1
-            points = []
-            for x in range(x1, x2 + 1):
-                coord = vector([y, x]) if is_steep else vector([x, y])
-                points.append(coord)
-                error -= abs(dy)
-                if error < 0:
-                    y += ystep
-                    error += dx
-            return points
-        line_of_sight = bresenham(self.position, other_position)[1:-1]
+        line_of_sight = self.bresenham(self.position, other_position)[1:-1]
         if all([self.map[x].transparent for x in line_of_sight]):
             return Object.dist(self.position, other_position)
         return False

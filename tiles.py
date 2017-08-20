@@ -1,7 +1,5 @@
 #! /usr/bin/python3
 
-from typing import *
-
 import pygame
 from pygame.locals import *
 
@@ -28,7 +26,7 @@ class Tile(Object):
 class Ladder(Tile):
 
     def __init__(self, *args, character: str = 'H', color: tuple = YELLOW,
-                 solid=False, **kwargs) -> None:
+                 solid: bool = False, **kwargs) -> None:
         kwargs.update({'character': character, 'color': color, 'solid': solid})
         super().__init__(*args, **kwargs)
 

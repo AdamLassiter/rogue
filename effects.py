@@ -1,6 +1,5 @@
 #! /usr/bin/python3
 
-from typing import *
 from random import random
 
 import pygame
@@ -15,7 +14,7 @@ pygame.init()
 
 class Effect(Object):
 
-    def __init__(self, *args, solid=False, transparent=True, **kwargs):
+    def __init__(self, *args, solid: bool = False, transparent: bool = True, **kwargs):
         kwargs.update({'solid': solid, 'transparent': transparent})
         super().__init__(*args, **kwargs)
 
@@ -28,9 +27,13 @@ class Effect(Object):
     def update(self):
         self.position += self.velocity
 
+    def destroy(self):
+        del self.map.effects[self.map.effects.index(self)]
+
 
 class HitMarker(Effect):
-    def __init__(self, *args, character='*', color=RED, **kwargs):
+
+    def __init__(self, *args, character: str = '*', color: tuple = RED, **kwargs):
         kwargs.update({'character': character, 'color': color})
         super().__init__(*args, **kwargs)
         self.position += vector([random() - 0.5, random() - 0.5])
@@ -40,6 +43,61 @@ class HitMarker(Effect):
     def draw(self, surface: pygame.Surface):
         self.character.set_alpha(255 * self.lifespan  / 3)
         super().draw(surface)
+
+    def update(self):
+        if self.lifespan <= 0:
+            self.destroy()
+        self.lifespan -= 1
+        super().update()
+
+
+class StoneGlare(Effect):
+
+    def __init__(self, *args, character: str = '\N{FULL BLOCK}',
+                 color: tuple = GREY, **kwargs):
+        kwargs.update({'character': character, 'color': color})
+        super().__init__(*args, **kwargs)
+        if self.player.speed > 0:
+            self.player.speed -= 1
+            self.dv = 1
+        else:
+            self.dv = 0
+        self.lifespan = 5
+
+    def draw(self, surface: pygame.Surface):
+        self.character.set_alpha(128)
+        if self.lifespan % 2:
+            super().draw(surface)
+
+    def update(self):
         self.lifespan -= 1
         if self.lifespan <= 0:
-            del self.map.objects[self.map.objects.index(self)]
+            self.player.speed += self.dv
+            self.destroy()
+        self.position = self.player.position
+
+
+class Fireball(Effect):
+
+    def __init__(self, *args, parent: Object = None, character: str = 'o',
+                 color: tuple = RED, **kwargs):
+        kwargs.update({'character': character, 'color': color})
+        super().__init__(*args, **kwargs)
+        self.parent = parent
+        self.path = Object.bresenham(parent.position, self.player.position)
+        self.distance = 0
+
+    def update(self):
+        self.distance += 1
+        self.distance %= len(self.path)
+        self.distance += self.distance == 0
+        d_pos = self.path[self.distance] - self.path[self.distance - 1]
+        next_obj = self.map[self.position + d_pos]
+        if next_obj.solid:
+            self.parent.fireball = True
+            if hasattr(next_obj, 'deal_damage'):
+                self.parent.deal_damage(next_obj)
+            self.destroy()
+        else:
+            self.velocity = d_pos
+        super().update()

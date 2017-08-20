@@ -4,8 +4,9 @@ from random import randrange
 from typing import *
 
 from constants import *
+from objects import Object
 from tiles import Tile, Ladder
-from fighters import Troll
+from fighters import Troll, Gorgon, Wizard
 from vector import vector
 
 import pygame
@@ -38,8 +39,7 @@ class Map:
     def __init__(self, player_ref, size: vector) -> None:
         self.player = player_ref
         self.size = size
-        self.objects = []
-        self.gen_map()
+        self.effects = []
 
     def __getitem__(self, slices: Union[slice, Iterable]):
         if isinstance(slices, (list, tuple)):
@@ -70,7 +70,7 @@ class Map:
             h, v = slices[0], slices[1]
         else:
             h, v = slices, slice(None, None, None)
-        if isinstance(val, Tile):
+        if isinstance(val, Object):
             self.map[v][h] = val
         else:
             self.mapdata[v][h] = val
@@ -124,15 +124,16 @@ class Map:
         self.mapdata = [[['#', GREY, True] for x in range(self.size[0])]
                         for y in range(self.size[1])]
         # self.rooms = gen_rooms(int((self.size[0] * self.size[1]) ** 0.5))
-        self.rooms = gen_rooms(3)
+        self.rooms = gen_rooms(10)
         carve(self.rooms)
         self.build()
         self.populate()
 
     def populate(self):
-        self.objects.extend([Troll(self.player, self, r.center()) for r in self.rooms[1:-1]])
-        self[self.rooms[-1].center()] = Ladder(self.player, self,
-                                               self.rooms[-1].center())
+        self[self.rooms[1].center()] = Troll(self.player, self, self.rooms[1].center())
+        self[self.rooms[2].center()] = Gorgon(self.player, self, self.rooms[2].center())
+        self[self.rooms[3].center()] = Wizard(self.player, self, self.rooms[3].center())
+        self[self.rooms[-1].center()] = Ladder(self.player, self, self.rooms[-1].center())
 
     def build(self):
         self.map = [[Tile(self.player, self, vector([x, y]), *t) for x, t in enumerate(row)]
@@ -142,26 +143,24 @@ class Map:
         x0, y0 = position = self.player.position
         xc, yc = position - GAME_CENTER
         self[xc:xc + GAME_SPRITE_WIDTH, yc:yc + GAME_SPRITE_HEIGHT].draw(surface)
-        for obj in self.objects:
-            obj.draw(surface)
+        for effect in self.effects:
+            effect.draw(surface)
 
     def update(self):
         x0, y0 = position = self.player.position
         xc, yc = position - GAME_CENTER
         self[xc:xc + GAME_SPRITE_WIDTH, yc:yc + GAME_SPRITE_HEIGHT].update()
-        for obj in self.objects:
-            obj.update()
+        for effect in self.effects:
+            effect.update()
 
     def blocked(self, position: vector) -> bool:
-        if self[position].solid:
-            return True
-        if any([x.solid and x.position == position for x in self.objects]):
-            return True
+        return self[position].solid
 
 
 class MapSlice(list):
 
     def __init__(self, player_ref, map_slice) -> None:
+        from functools import reduce
         self.player = player_ref
         self.size = vector([len(map_slice[0]), len(map_slice)])
         super().__init__(map_slice)

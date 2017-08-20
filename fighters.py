@@ -1,6 +1,5 @@
-#! /usr/bin/python3
+#! /usr/bin/python2
 
-from typing import *
 from random import randrange
 
 import pygame
@@ -8,7 +7,7 @@ from pygame.locals import *
 
 from constants import *
 from objects import Object
-from effects import HitMarker
+from effects import HitMarker, StoneGlare, Fireball
 from vector import vector
 
 pygame.init()
@@ -16,30 +15,65 @@ pygame.init()
 
 class Fighter(Object):
 
-    def __init__(self, *args, stats: tuple = (0, 0, 0), **kwargs) -> None:
-        self.max_hp, self.attack, self.defense = stats
-        self.hp = self.max_hp
-        super().__init__(*args, **kwargs)
+    def __setattr__(self, name, value):
+        if name == 'position' and value is not None:
+            if self.underneath is not None:
+                self.map[self.position] = self.underneath
+            self.underneath = self.map[value]
+            self.map[value] = self
+        super().__setattr__(name, value)
 
-    def deal_damage(self, target):
+    def __init__(self, *args, stats: tuple = (0, 0, 0, 0), **kwargs) -> None:
+        self.max_hp, self.attack, self.defense, self.speed = stats
+        self.hp = self.max_hp
+        self.underneath = None
+        super().__init__(*args, **kwargs)
+        self.move_counter = 1
+
+    def update(self):
+        if self.move_counter == 0:
+            super().update()
+        self.move_counter += 1
+        self.move_counter %= 5 - self.speed
+
+    def deal_damage(self, target: Object):
         damage = max((self.attack - target.defense, 0))
         target.take_damage(damage)
 
-    def take_damage(self, damage):
+    def take_damage(self, damage: int):
         hit = HitMarker(self.player, self.map, self.position)
-        self.map.objects.append(hit)
+        self.map.effects.append(hit)
         self.hp -= damage
         if self.hp <= 0:
             # ded
             del self
 
 
+class Player(Fighter):
+
+    def __init__(self, *args, stats: tuple = (9, 2, 0, 4), character: str = '@', **kwargs) -> None:
+        kwargs.update({'stats': stats, 'character': character})
+        super().__init__(*args, **kwargs)
+        self.inventory = []
+
+    def update(self):
+        keypresses = list(map(int, pygame.key.get_pressed()))
+        if self.move_counter == 0:
+            self.velocity = vector([keypresses[K_d] - keypresses[K_a],
+                                    keypresses[K_s] - keypresses[K_w]])
+        super().update()
+
+    def take_damage(self, damage: int):
+        super().take_damage(damage)
+        if self.hp <= 0:
+            pygame.event.post(pygame.event.Event(PLAYER_KILL, {}))
+
+
 class Troll(Fighter):
 
-    def __init__(self, *args, stats: tuple = (2, 1, 0), character: str = 'T',
+    def __init__(self, *args, stats: tuple = (5, 1, 1, 1), character: str = 'T',
                  color: tuple = GREEN, **kwargs) -> None:
         kwargs.update({'stats':stats, 'character': character, 'color': color})
-        self.move_counter = 0
         super().__init__(*args, **kwargs)
 
     def draw(self, surface: pygame.Surface):
@@ -47,10 +81,8 @@ class Troll(Fighter):
             super().draw(surface)
 
     def update(self):
-        self.move_counter += 1
-        self.move_counter %= 2
         visible = self.visible(self.player.position)
-        if visible and self.move_counter:
+        if visible and self.move_counter == 0:
             dist = visible
             d_pos = self.player.position - self.position
             if dist >= 2:
@@ -60,27 +92,52 @@ class Troll(Fighter):
                 self.deal_damage(self.player)
             else:
                 pass
-        elif self.move_counter:
+        elif self.move_counter == 0:
             self.velocity = vector([randrange(-1, 2) for _ in range(2)])
         else:
             self.velocity = vector([0, 0])
         super().update()
 
 
-class Player(Fighter):
+class Gorgon(Fighter):
 
-    def __init__(self, *args, character: str = '@', **kwargs) -> None:
-        kwargs.update({'character': character})
+    def __init__(self, *args, stats: tuple = (1, 0, 0, 0), character: str = 'G',
+                 color: tuple = GREEN, **kwargs):
+        kwargs.update({'stats': stats, 'character': character, 'color': color})
         super().__init__(*args, **kwargs)
-        self.inventory = []
+        self.explored = False
+
+    def draw(self, surface: pygame.Surface):
+        if self.explored:
+            super().draw(surface)
 
     def update(self):
-        keypresses = list(map(int, pygame.key.get_pressed()))
-        self.velocity = vector([keypresses[K_d] - keypresses[K_a],
-                                keypresses[K_s] - keypresses[K_w]])
+        dist = self.visible(self.player.position)
+        if dist:
+            self.explored = True
+        if 0 < dist < 10 and self.move_counter == 0:
+            self.map.effects.append(StoneGlare(self.player, self.map,
+                                               self.player.position))
         super().update()
 
-    def take_damage(self, damage):
-        super().take_damage(damage)
-        if self.hp - damage <= 0:
-            pygame.event.post(pygame.event.Event(PLAYER_KILL, {}))
+
+class Wizard(Fighter):
+
+    def __init__(self, *args, stats: tuple = (5, 2, 0, 3), character: str = 'W',
+                 color: tuple = PURPLE, **kwargs):
+        kwargs.update({'stats': stats, 'character': character, 'color': color})
+        super().__init__(*args, **kwargs)
+        self.fireball = True
+
+    def draw(self, surface: pygame.Surface):
+        if self.visible(self.player.position):
+            super().draw(surface)
+
+    def update(self):
+        dist = self.visible(self.player.position)
+        if 0 < dist < 10 and self.move_counter == 0 and self.fireball:
+            self.fireball = False
+            self.map.effects.append(Fireball(self.player, self.map,
+                                             self.position, parent=self))
+        self.velocity = vector([randrange(-1, 2) for _ in range(2)])
+        super().update()
