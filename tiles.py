@@ -17,10 +17,26 @@ class Tile(Object):
         self.explored = False
 
     def draw(self, surface: pygame.Surface):
+        if self.visible(self.player.position):
+            self.explored = True
         if self.explored:
             super().draw(surface)
-        else:
-            self.explored = self.visible(self.player.position)
+
+
+class Dirt(Tile):
+
+    def __init__(self, *args, character: str = '.', color: tuple = BROWN,
+                 solid: bool = False, **kwargs) -> None:
+        kwargs.update({'character': character, 'color': color, 'solid': solid})
+        super().__init__(*args, **kwargs)
+
+
+class Wall(Tile):
+
+    def __init__(self, *args, character: str = '#', color: tuple = GREY,
+                 solid: bool = True, **kwargs) -> None:
+        kwargs.update({'character': character, 'color': color, 'solid': solid})
+        super().__init__(*args, **kwargs)
 
 
 class Ladder(Tile):
@@ -33,4 +49,3 @@ class Ladder(Tile):
     def update(self):
         if self.player.position == self.position:
             pygame.event.post(pygame.event.Event(LADDER_EVENT, {'ladder': self}))
-            self.player.inventory.append(self)

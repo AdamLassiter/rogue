@@ -54,8 +54,9 @@ class Hud(Object):
         self.labels = [Label(p + vector([0, 0]), ' HP', lambda: str(pr.hp)),
                        Label(p + vector([0, 1]), 'ATK', lambda: str(pr.attack)),
                        Label(p + vector([0, 2]), 'DEF', lambda: str(pr.defense)),
-                       Label(p + vector([0, 3]), 'SPD', lambda: str(pr.speed))]
-        self.inventory = Inventory(player_ref, p + vector([0, 5]))
+                       Label(p + vector([0, 3]), 'SPD', lambda: str(pr.speed)),
+                       Label(p + vector([0, 4]), 'POS', lambda: str(pr.position))]
+        self.inventory = Inventory(player_ref, p + vector([0, 6]))
         self.solid = False
 
     def draw(self, surface: pygame.Surface):

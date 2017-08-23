@@ -18,11 +18,15 @@ class Object(object):
                  color: tuple = WHITE, solid: bool = True, transparent: bool = None) -> None:
          self.player = player_ref
          self.map = map_ref
+         self.char = character
          self.character = Object.FONT.render(character, False, color).convert()
          self.position = position
          self.solid = solid
          self.transparent = not solid if transparent is None else transparent
          self.velocity = vector([0, 0])
+
+    def __repr__(self):
+        return self.character
 
     @staticmethod
     def dist(objA: tuple, objB: tuple) -> float:
@@ -39,12 +43,8 @@ class Object(object):
         surface.blit(self.character, rect)
 
     @staticmethod
-    def bresenham(start: vector, end: vector):
-        try:
-            x1, y1 = start
-        except Exception as e:
-            print(start)
-            raise e
+    def bresenham(start: vector, end: vector) -> list:
+        x1, y1 = start
         x2, y2 = end
         dx = x2 - x1
         dy = y2 - y1
@@ -78,5 +78,6 @@ class Object(object):
         return False
 
     def update(self):
-        if not self.map.blocked(self.position + self.velocity):
+        if not self.map[self.position + self.velocity].solid:
             self.position += self.velocity
+        self.velocity = vector([0, 0])

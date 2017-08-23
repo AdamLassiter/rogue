@@ -5,7 +5,7 @@ from pygame.locals import *
 
 from constants import *
 from hud import Hud
-from dungeon import Map, Room
+from maps import Dungeon
 from fighters import Player
 from vector import vector
 
@@ -18,9 +18,9 @@ class Game:
         self.main_surf = pygame.display.set_mode((GAME_PIXEL_WIDTH, GAME_PIXEL_HEIGHT),
                                                  pygame.FULLSCREEN)
         self.player = Player(None, None, None)
-        self.map = Map(self.player, vector([100, 100]))
-        self.map.gen_map()
-        Player.__init__(self.player, self.player, self.map, self.map.rooms[0].center())
+        self.map = Dungeon(self.player, vector([51, 51]))
+        Player.__init__(self.player, self.player, self.map,
+                        self.map.player_start)
         self.hud = Hud(self.player)
 
     def draw(self):
@@ -28,6 +28,7 @@ class Game:
         self.map.draw(self.main_surf)
         self.hud.draw(self.main_surf)
         pygame.display.flip()
+        # print(self.map.map)
 
     def update(self):
         self.map.update()

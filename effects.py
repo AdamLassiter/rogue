@@ -94,10 +94,25 @@ class Fireball(Effect):
         d_pos = self.path[self.distance] - self.path[self.distance - 1]
         next_obj = self.map[self.position + d_pos]
         if next_obj.solid:
-            self.parent.fireball = True
-            if hasattr(next_obj, 'deal_damage'):
+            if hasattr(next_obj, 'deal_damage') and next_obj is not self.parent:
                 self.parent.deal_damage(next_obj)
             self.destroy()
         else:
             self.velocity = d_pos
         super().update()
+
+
+class Pickup(Effect):
+
+    def __init__(self, *args, solid: bool = False, **kwargs):
+        kwargs.update({'solid': solid})
+        super().__init__(*args, **kwargs)
+
+    def pickup(self):
+        raise NotImplementedError
+
+    def update(self):
+        if self.player.position == self.position:
+            self.pickup()
+            self.player.inventory.append(self)
+            self.destroy()

@@ -1,4 +1,4 @@
-#! /usr/bin/python2
+#! /usr/bin/python3
 
 from random import randrange
 
@@ -33,6 +33,8 @@ class Fighter(Object):
     def update(self):
         if self.move_counter == 0:
             super().update()
+        if self.underneath is not None:
+            self.underneath.update()
         self.move_counter += 1
         self.move_counter %= 5 - self.speed
 
@@ -127,7 +129,7 @@ class Wizard(Fighter):
                  color: tuple = PURPLE, **kwargs):
         kwargs.update({'stats': stats, 'character': character, 'color': color})
         super().__init__(*args, **kwargs)
-        self.fireball = True
+        self.fireball_counter = 0
 
     def draw(self, surface: pygame.Surface):
         if self.visible(self.player.position):
@@ -135,9 +137,10 @@ class Wizard(Fighter):
 
     def update(self):
         dist = self.visible(self.player.position)
-        if 0 < dist < 10 and self.move_counter == 0 and self.fireball:
-            self.fireball = False
+        if 0 < dist < 10 and self.move_counter == self.fireball_counter == 0:
             self.map.effects.append(Fireball(self.player, self.map,
                                              self.position, parent=self))
-        self.velocity = vector([randrange(-1, 2) for _ in range(2)])
+        if self.move_counter == 0:
+            self.velocity = vector([randrange(-1, 2) for _ in range(2)])
+            self.fireball_counter = (self.fireball_counter + 1) % 5
         super().update()
