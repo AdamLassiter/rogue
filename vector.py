@@ -2,6 +2,9 @@
 
 class vector(list):
 
+    def __copy__(self):
+        return self.__class__(tuple(self))
+
     def __or__(self, other):
         return vector(list(self) + list(other))
 

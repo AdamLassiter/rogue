@@ -19,18 +19,16 @@ class Fighter(Object):
         if name == 'position' and value is not None:
             if self.underneath is not None:
                 self.map[self.position] = self.underneath
-                self.last_position = self.position
             self.underneath = self.map[value]
             self.map[value] = self
         super().__setattr__(name, value)
 
-    def __init__(self, *args, stats: tuple = (0, 0, 0, 0), transparent: bool =
-                 True, **kwargs):
+    def __init__(self, *args, stats: tuple = (0, 0, 0, 0), transparent: bool = True,
+                 **kwargs):
         self.max_hp, self.attack, self.defense, self.speed = stats
         self.hp = self.max_hp
         self.underneath = None
         kwargs.update({'transparent': transparent})
-        self.last_position = args[2]
         super().__init__(*args, **kwargs)
         self.move_counter = 1
 

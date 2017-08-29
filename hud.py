@@ -48,24 +48,16 @@ class Inventory:
         pass
 
 
-t = 0
-def fps():
-    global t
-    ret, t = time() - t, time()
-    return str(int(1 / ret))
-
-
 class Hud(Object):
 
-    def __init__(self, player_ref):
+    def __init__(self, player_ref, ss):
         self.player_ref = pr = player_ref
         self.position = p = vector([0, 0])
         self.labels = [Label(p + vector([0, 0]), ' HP', lambda: str(pr.hp)),
                        Label(p + vector([0, 1]), 'ATK', lambda: str(pr.attack)),
                        Label(p + vector([0, 2]), 'DEF', lambda: str(pr.defense)),
                        Label(p + vector([0, 3]), 'SPD', lambda: str(pr.speed)),
-                       Label(p + vector([0, 4]), 'FPS', fps),
-                       Label(p + vector([0, 5]), 'POS', lambda: str(pr.last_position))]
+                       Label(p + vector([0, 4]), 'SAV', ss)]
         self.inventory = Inventory(player_ref,
                                    p + vector([GAME_SPRITE_WIDTH - 1, 0]))
         self.solid = False

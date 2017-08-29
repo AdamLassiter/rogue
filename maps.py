@@ -60,7 +60,6 @@ class Map:
             self.map = from_map
         else:
             self.gen_map()
-        assert self.map.ndim >= 2
 
     def __getitem__(self, slice_):
         xs, ys = slice_
@@ -158,18 +157,20 @@ class Maze(Map):
                  for x in range(self.size[0])] for y in range(self.size[1])]
         self.map = array(_map, ndmin=2)
         self.player_start = vector([1, 1])
-        self[self.player_start] = Bonfire(self.player, self, self.player_start)
 
 
 class Dungeon(Maze):
     ATTEMPTS = 40
 
     def populate(self):
-        items = [Sword, Ladder]
+        self[self.player_start] = Bonfire(self.player, self, self.player_start)
+
+        items = [Sword, Sword, Sword, Ladder]
         for Item, room in zip(items, self.rooms):
             pos = vector([randrange(room.x1+1, room.x2),
                           randrange(room.y1+1, room.y2)])
             Item(self.player, self, pos).spawn()
+
         for room in self.rooms[len(items):]:
             Spawn = choice([Troll, Wizard, Gorgon])
             pos = vector([randrange(room.x1+1, room.x2),

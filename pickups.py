@@ -17,6 +17,7 @@ class Pickup(Effect):
         super().__init__(*args, **kwargs)
 
     def pickup(self):
+        self.player.inventory.append(self)
         self.destroy()
 
     def drop(self):
@@ -29,7 +30,6 @@ class Pickup(Effect):
     def update(self):
         if self.player.position == self.position:
             self.pickup()
-            self.player.inventory.append(self)
 
 
 class Ladder(Pickup):

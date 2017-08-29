@@ -15,17 +15,21 @@ pygame.init()
 
 
 class Game:
-    global game
 
     def __init__(self):
         self.main_surf = pygame.display.set_mode((GAME_PIXEL_WIDTH, GAME_PIXEL_HEIGHT),
                                                  pygame.FULLSCREEN)
-        self.player = Player(None, None, None)
-        self.map = Dungeon(self.player, vector([51, 51]))
-        Player.__init__(self.player, self.player, self.map,
-                        self.map.player_start)
-        self.hud = Hud(self.player)
-        self.savestate = None
+        self.savestate = []
+        self.init(Dungeon)
+
+    def init(self, Maptype):
+        self.player = p = Player(None, None, None)
+        self.map = m = Maptype(p, vector([51, 51]))
+        Player.__init__(p, p, m, m.player_start)
+        for item in self.savestate:
+            item.player = p
+            item.pickup()
+        self.hud = Hud(self.player, lambda: str(self.savestate))
 
     def draw(self):
         self.main_surf.fill(BLACK)
@@ -50,10 +54,10 @@ class Game:
             elif event.type == LADDER_EVENT:
                 self.state = 'quit'
             elif event.type == PLAYER_KILL:
-                self.player, self.map = self.savestate
+                self.init(type(self.map))
+                pygame.event.clear()
             elif event.type == BONFIRE_EVENT:
-                if self.player.position != self.player.last_position:
-                    self.savestate = (copy(self.player), copy(self.map))
+                self.savestate = copy(self.player.inventory)
 
     def main_loop(self):
         self.state = 'play'

@@ -28,7 +28,8 @@ class Effect(Object):
         self.map.effects.append(self)
 
     def destroy(self):
-        del self.map.effects[self.map.effects.index(self)]
+        if self in self.map.effects:
+            del self.map.effects[self.map.effects.index(self)]
 
 
 class HitMarker(Effect):
@@ -75,15 +76,14 @@ class StoneGlare(Effect):
 
     def draw(self, surface: pygame.Surface):
         self.alpha = 128
-        if self.lifespan % 2:
-            super().draw(surface)
+        super().draw(surface)
 
     def update(self):
         self.lifespan -= 1
         if self.lifespan <= 0:
             self.player.speed += self.dv
             self.destroy()
-        self.position = self.player.position
+        self.position = self.player.position + self.player.velocity
 
 
 class Fireball(Effect):
