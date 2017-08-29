@@ -15,18 +15,33 @@ class Object(object):
     FONT = pygame.font.Font('./DejaVuSansMono.ttf', OBJECT_SIZE)
 
     def __init__(self, player_ref, map_ref, position: vector, character: str = '',
-                 color: tuple = WHITE, solid: bool = True, transparent: bool = None) -> None:
+                 color: tuple = WHITE, solid: bool = True, transparent: bool = None):
          self.player = player_ref
          self.map = map_ref
          self.char = character
+         color = tuple(map(lambda x: 0 if x < 0 else 255 if x > 255 else x,
+                           map(lambda x: x * randrange(90, 110) / 100, color)))
          self.character = Object.FONT.render(character, False, color).convert()
          self.position = position
          self.solid = solid
          self.transparent = not solid if transparent is None else transparent
          self.velocity = vector([0, 0])
+         self.__d_alpha = False
+
+    @property
+    def alpha(self):
+        alpha = self.character.get_alpha()
+        return alpha if alpha is not None else 255
+
+    @alpha.setter
+    def alpha(self, alpha: int):
+        assert 0 <= alpha <= 255
+        if not self.__d_alpha:
+            self.character.set_alpha(alpha)
+            self.__d_alpha = True
 
     def __repr__(self):
-        return self.character
+        return self.char
 
     @staticmethod
     def dist(objA: tuple, objB: tuple) -> float:
@@ -37,10 +52,12 @@ class Object(object):
     def draw(self, surface: pygame.Surface):
         position = self.position - self.player.position
         alpha = 255 / (Object.dist((0, 0), position) / OBJECT_SHADOW + 1) ** 2
-        self.character.set_alpha(alpha)
+        if self.alpha < alpha or not self.__d_alpha:
+            self.alpha = alpha
         blit_at = (position + GAME_CENTER) * OBJECT_SIZE
         rect = self.character.get_rect(center=blit_at + OBJECT_SIZE // 2)
         surface.blit(self.character, rect)
+        self.__d_alpha = False
 
     @staticmethod
     def bresenham(start: vector, end: vector) -> list:
@@ -72,6 +89,8 @@ class Object(object):
         return list(reversed(points)) if swapped else points
 
     def visible(self, other_position: vector) -> int:
+        if self.position == other_position:
+            return True
         line_of_sight = self.bresenham(self.position, other_position)[1:-1]
         if all([self.map[x].transparent for x in line_of_sight]):
             return Object.dist(self.position, other_position)

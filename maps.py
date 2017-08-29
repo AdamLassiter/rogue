@@ -7,8 +7,9 @@ from typing import *
 
 from constants import *
 from objects import Object
-from tiles import Wall, Dirt, Ladder
+from tiles import Wall, Dirt, Bonfire
 from fighters import Troll, Gorgon, Wizard
+from pickups import Ladder, Sword
 from vector import vector
 
 import pygame
@@ -23,7 +24,7 @@ pygame.init()
 
 class Room:
 
-    def __init__(self, x: int, y: int, w: int, h: int) -> None:
+    def __init__(self, x: int, y: int, w: int, h: int):
         self.x1, self.x2 = x, x + w - 1
         self.y1, self.y2 = y, y + h - 1
         self.w, self.h = w, h
@@ -35,6 +36,7 @@ class Room:
     def __str__(self) -> str:
         return '(%s %s %s %s)' % (self.x1, self.x2, self.y1, self.y2)
 
+    @property
     def center(self) -> vector:
         return vector([self.x1 + self.x2, self.y1 + self.y2]) // 2
 
@@ -42,10 +44,14 @@ class Room:
         return (self.x1 <= other.x2 and self.x2 >= other.x1 and
                 self.y1 <= other.y2 and self.y2 >= other.y1)
 
+    @property
+    def slice(self) -> tuple:
+        return (slice(self.x1 + 1, self.x2, None), slice(self.y1 + 1, self.y2))
+
 
 class Map:
 
-    def __init__(self, player_ref, size: vector, from_map: array = None) -> None:
+    def __init__(self, player_ref, size: vector, from_map: array = None):
         self.player = player_ref
         self.size = size
         self.player_start = None
@@ -73,6 +79,10 @@ class Map:
         xs, ys = slice_
         self.map[ys, xs] = value
 
+    def __repr__(self):
+        return '\n'.join([''.join([repr(tile) for tile in row])
+                          for row in self.map])
+
     def gen_map(self):
         raise NotImplementedError
 
@@ -95,7 +105,7 @@ class Map:
 
 class MapSlice(Map):
 
-    def __init__(self, player_ref, map_slice: array) -> None:
+    def __init__(self, player_ref, map_slice: array):
         self.player = player_ref
         self.size = vector([len(map_slice[0]), len(map_slice)])
         self.map = map_slice
@@ -148,10 +158,23 @@ class Maze(Map):
                  for x in range(self.size[0])] for y in range(self.size[1])]
         self.map = array(_map, ndmin=2)
         self.player_start = vector([1, 1])
+        self[self.player_start] = Bonfire(self.player, self, self.player_start)
 
 
 class Dungeon(Maze):
     ATTEMPTS = 40
+
+    def populate(self):
+        items = [Sword, Ladder]
+        for Item, room in zip(items, self.rooms):
+            pos = vector([randrange(room.x1+1, room.x2),
+                          randrange(room.y1+1, room.y2)])
+            Item(self.player, self, pos).spawn()
+        for room in self.rooms[len(items):]:
+            Spawn = choice([Troll, Wizard, Gorgon])
+            pos = vector([randrange(room.x1+1, room.x2),
+                          randrange(room.y1+1, room.y2)])
+            self[pos] = Spawn(self.player, self, pos)
 
     def gen_map(self):
         super().gen_map()
@@ -162,14 +185,9 @@ class Dungeon(Maze):
             x = randrange(0, self.size[0] - width, 2)
             y = randrange(0, self.size[1] - height, 2)
             room = Room(x, y, width, height)
-            if any(map(room.overlaps, self.rooms)):
-                continue
-            else:
+            if not any(map(room.overlaps, self.rooms)):
                 self.rooms.append(room)
-        for room in self.rooms:
-            self[room.x1+1: room.x2,
-                 room.y1+1: room.y2] = [[Dirt(self.player, self, vector([x, y]))
-                                         for x in range(room.x1+1, room.x2)]
-                                        for y in range(room.y1+1, room.y2)]
-            spawn = choice([Troll, Wizard, Gorgon])
-            self[room.center()] = spawn(self.player, self, room.center())
+                self[room.slice] = [[Dirt(self.player, self, vector([x, y]))
+                                     for x in range(room.x1 + 1, room.x2)]
+                                    for y in range(room.y1 + 1, room.y2)]
+        self.populate()

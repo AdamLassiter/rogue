@@ -4,6 +4,7 @@ import pygame
 from pygame.locals import *
 
 from constants import *
+from effects import BonfireFlame
 from objects import Object
 from vector import vector
 
@@ -12,21 +13,26 @@ pygame.init()
 
 class Tile(Object):
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.explored = False
 
     def draw(self, surface: pygame.Surface):
         if self.visible(self.player.position):
-            self.explored = True
-        if self.explored:
             super().draw(surface)
+        elif self.explored:
+            self.alpha = 64
+            super().draw(surface)
+
+    def update(self):
+        if self.visible(self.player.position):
+            self.explored = True
 
 
 class Dirt(Tile):
 
     def __init__(self, *args, character: str = '.', color: tuple = BROWN,
-                 solid: bool = False, **kwargs) -> None:
+                 solid: bool = False, **kwargs):
         kwargs.update({'character': character, 'color': color, 'solid': solid})
         super().__init__(*args, **kwargs)
 
@@ -34,18 +40,25 @@ class Dirt(Tile):
 class Wall(Tile):
 
     def __init__(self, *args, character: str = '#', color: tuple = GREY,
-                 solid: bool = True, **kwargs) -> None:
+                 solid: bool = True, **kwargs):
         kwargs.update({'character': character, 'color': color, 'solid': solid})
         super().__init__(*args, **kwargs)
 
 
-class Ladder(Tile):
+class Bonfire(Tile):
 
-    def __init__(self, *args, character: str = 'H', color: tuple = YELLOW,
-                 solid: bool = False, **kwargs) -> None:
+    def __init__(self, *args, character: str = 'x', color: tuple = DARK_BROWN,
+                 solid: bool = False, **kwargs):
         kwargs.update({'character': character, 'color': color, 'solid': solid})
         super().__init__(*args, **kwargs)
+
+    def draw(self, surface: pygame.Surface):
+        self.alpha = 255
+        super().draw(surface)
 
     def update(self):
-        if self.player.position == self.position:
-            pygame.event.post(pygame.event.Event(LADDER_EVENT, {'ladder': self}))
+        if self.position == self.player.position:
+            pygame.event.post(pygame.event.Event(BONFIRE_EVENT, {}))
+        for _ in range(3):
+            BonfireFlame(self.player, self.map, self.position).spawn()
+        super().update()

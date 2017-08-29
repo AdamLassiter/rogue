@@ -38,3 +38,8 @@ class vector(list):
         if isinstance(other, vector):
             return vector(map(lambda x, y: x // y, self, other))
         return vector(map(lambda x: x // other, self))
+
+    def __pow__(self, other):
+        if isinstance(other, vector):
+            return vector(map(lambda x, y: x ** y, self, other))
+        return vector(map(lambda x: x // other, self))

@@ -1,5 +1,7 @@
 #! /usr/bin/python3
 
+from time import time
+
 import pygame
 
 from constants import *
@@ -12,7 +14,7 @@ pygame.init()
 class Label:
     FONT = Object.FONT
 
-    def __init__(self, position: vector, label: str, value, color: tuple = WHITE) -> None:
+    def __init__(self, position: vector, label: str, value, color: tuple = WHITE):
         self.position = position
         self.label = label
         self.value = value
@@ -46,6 +48,13 @@ class Inventory:
         pass
 
 
+t = 0
+def fps():
+    global t
+    ret, t = time() - t, time()
+    return str(int(1 / ret))
+
+
 class Hud(Object):
 
     def __init__(self, player_ref):
@@ -55,8 +64,10 @@ class Hud(Object):
                        Label(p + vector([0, 1]), 'ATK', lambda: str(pr.attack)),
                        Label(p + vector([0, 2]), 'DEF', lambda: str(pr.defense)),
                        Label(p + vector([0, 3]), 'SPD', lambda: str(pr.speed)),
-                       Label(p + vector([0, 4]), 'POS', lambda: str(pr.position))]
-        self.inventory = Inventory(player_ref, p + vector([0, 6]))
+                       Label(p + vector([0, 4]), 'FPS', fps),
+                       Label(p + vector([0, 5]), 'POS', lambda: str(pr.last_position))]
+        self.inventory = Inventory(player_ref,
+                                   p + vector([GAME_SPRITE_WIDTH - 1, 0]))
         self.solid = False
 
     def draw(self, surface: pygame.Surface):

@@ -1,5 +1,7 @@
 #! /usr/bin/python3
 
+from copy import copy
+
 import pygame
 from pygame.locals import *
 
@@ -13,8 +15,9 @@ pygame.init()
 
 
 class Game:
+    global game
 
-    def __init__(self) -> None:
+    def __init__(self):
         self.main_surf = pygame.display.set_mode((GAME_PIXEL_WIDTH, GAME_PIXEL_HEIGHT),
                                                  pygame.FULLSCREEN)
         self.player = Player(None, None, None)
@@ -22,15 +25,17 @@ class Game:
         Player.__init__(self.player, self.player, self.map,
                         self.map.player_start)
         self.hud = Hud(self.player)
+        self.savestate = None
 
     def draw(self):
         self.main_surf.fill(BLACK)
         self.map.draw(self.main_surf)
         self.hud.draw(self.main_surf)
         pygame.display.flip()
-        # print(self.map.map)
+        # print(self.map)
 
     def update(self):
+        self.eval_events()
         self.map.update()
         self.hud.update()
 
@@ -43,11 +48,12 @@ class Game:
                 if event.key in [K_ESCAPE, KMOD_LALT | K_F4]:
                     self.state = 'quit'
             elif event.type == LADDER_EVENT:
-                # self.player.inventory.append(('H', YELLOW))
-                # self.state = 'quit'
-                pass
-            elif event.type == PLAYER_KILL:
                 self.state = 'quit'
+            elif event.type == PLAYER_KILL:
+                self.player, self.map = self.savestate
+            elif event.type == BONFIRE_EVENT:
+                if self.player.position != self.player.last_position:
+                    self.savestate = (copy(self.player), copy(self.map))
 
     def main_loop(self):
         self.state = 'play'
@@ -58,8 +64,6 @@ class Game:
             self.update()
             # draw everything
             self.draw()
-            # eval event
-            self.eval_events()
         # exit
         pygame.quit()
         exit()
