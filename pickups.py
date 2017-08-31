@@ -48,6 +48,7 @@ class Sword(Pickup):
 
     def __init__(self, *args, character: str = '/', color: tuple = GREY, **kwargs):
         kwargs.update({'character': character, 'color': color})
+        self.attacks = ['|', '-', '/', '\\']
         super().__init__(*args, **kwargs)
 
     def pickup(self):

@@ -42,6 +42,11 @@ class Object(object):
 
     def __repr__(self):
         return self.char
+        if hasattr(self, 'explored'):
+            visible = getattr(self, 'explored')
+        else:
+            visible = self.visible(self.player.position)
+        return self.char if visible else ' '
 
     @staticmethod
     def dist(objA: tuple, objB: tuple) -> float:

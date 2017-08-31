@@ -56,7 +56,7 @@ class Map:
         self.size = size
         self.player_start = None
         self.effects = []
-        if from_map:
+        if from_map is not None:
             self.map = from_map
         else:
             self.gen_map()
@@ -105,9 +105,8 @@ class Map:
 class MapSlice(Map):
 
     def __init__(self, player_ref, map_slice: array):
-        self.player = player_ref
-        self.size = vector([len(map_slice[0]), len(map_slice)])
-        self.map = map_slice
+        size = vector([len(map_slice[0]), len(map_slice)])
+        super().__init__(player_ref, size, from_map=map_slice)
 
     def draw(self, surface: pygame.Surface):
         # print(self.map)
@@ -163,15 +162,16 @@ class Dungeon(Maze):
     ATTEMPTS = 40
 
     def populate(self):
+        self.player_start = self.rooms[0].center
         self[self.player_start] = Bonfire(self.player, self, self.player_start)
 
-        items = [Sword, Sword, Sword, Ladder]
-        for Item, room in zip(items, self.rooms):
+        items = [Ladder, Sword]
+        for Item, room in zip(items, self.rooms[1:]):
             pos = vector([randrange(room.x1+1, room.x2),
                           randrange(room.y1+1, room.y2)])
             Item(self.player, self, pos).spawn()
 
-        for room in self.rooms[len(items):]:
+        for room in self.rooms[len(items) + 1:]:
             Spawn = choice([Troll, Wizard, Gorgon])
             pos = vector([randrange(room.x1+1, room.x2),
                           randrange(room.y1+1, room.y2)])
@@ -179,7 +179,9 @@ class Dungeon(Maze):
 
     def gen_map(self):
         super().gen_map()
-        self.rooms = []
+        br_x, br_y = self.size - (ROOM_MIN_SIZE + 1)
+        self.rooms = [Room(0, 0, ROOM_MIN_SIZE, ROOM_MIN_SIZE),
+                      Room(br_x, br_y, ROOM_MIN_SIZE, ROOM_MIN_SIZE)]
         for _ in range(Dungeon.ATTEMPTS):
             width = randrange(ROOM_MIN_SIZE, ROOM_MAX_SIZE, 2)
             height = randrange(ROOM_MIN_SIZE, ROOM_MAX_SIZE, 2)
@@ -188,7 +190,8 @@ class Dungeon(Maze):
             room = Room(x, y, width, height)
             if not any(map(room.overlaps, self.rooms)):
                 self.rooms.append(room)
-                self[room.slice] = [[Dirt(self.player, self, vector([x, y]))
-                                     for x in range(room.x1 + 1, room.x2)]
-                                    for y in range(room.y1 + 1, room.y2)]
+        for room in self.rooms:
+            self[room.slice] = [[Dirt(self.player, self, vector([x, y]))
+                                 for x in range(room.x1 + 1, room.x2)]
+                                for y in range(room.y1 + 1, room.y2)]
         self.populate()

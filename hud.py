@@ -53,13 +53,14 @@ class Hud(Object):
     def __init__(self, player_ref, ss):
         self.player_ref = pr = player_ref
         self.position = p = vector([0, 0])
-        self.labels = [Label(p + vector([0, 0]), ' HP', lambda: str(pr.hp)),
-                       Label(p + vector([0, 1]), 'ATK', lambda: str(pr.attack)),
-                       Label(p + vector([0, 2]), 'DEF', lambda: str(pr.defense)),
-                       Label(p + vector([0, 3]), 'SPD', lambda: str(pr.speed)),
-                       Label(p + vector([0, 4]), 'SAV', ss)]
-        self.inventory = Inventory(player_ref,
-                                   p + vector([GAME_SPRITE_WIDTH - 1, 0]))
+        labels = [(' HP', lambda: str(pr.hp)),
+                  ('ATK', lambda: str(pr.attack)),
+                  ('DEF', lambda: str(pr.defense)),
+                  ('SPD', lambda: str(pr.speed)),
+                  ('SAV', ss)]
+        self.labels = [Label(p + vector([0, i]), text, value)
+                       for i, (text, value) in enumerate(labels)]
+        self.inventory = Inventory(player_ref, p + vector([GAME_SPRITE_WIDTH - 1, 0]))
         self.solid = False
 
     def draw(self, surface: pygame.Surface):

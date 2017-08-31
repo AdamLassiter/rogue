@@ -17,14 +17,14 @@ pygame.init()
 class Game:
 
     def __init__(self):
-        self.main_surf = pygame.display.set_mode((GAME_PIXEL_WIDTH, GAME_PIXEL_HEIGHT),
-                                                 pygame.FULLSCREEN)
+        self.main_surf = pygame.display.set_mode((GAME_PIXEL_WIDTH,
+                                                  GAME_PIXEL_HEIGHT))
         self.savestate = []
         self.init(Dungeon)
 
     def init(self, Maptype):
         self.player = p = Player(None, None, None)
-        self.map = m = Maptype(p, vector([51, 51]))
+        self.map = m = Maptype(p, vector([31, 31]))
         Player.__init__(p, p, m, m.player_start)
         for item in self.savestate:
             item.player = p

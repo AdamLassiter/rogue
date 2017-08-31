@@ -51,16 +51,15 @@ class Fighter(Object):
         target.take_damage(damage)
 
     def take_damage(self, damage: int):
-        hit = HitMarker(self.player, self.map, self.position)
-        hit.spawn()
+        HitMarker(self.player, self.map, self.position).spawn()
         self.hp -= damage
         if self.hp <= 0:
-            pygame.event.post(pygame.event.Event(PLAYER_KILL, {}))
+            self.map[self.position] = self.underneath
 
 
 class Player(Fighter):
 
-    def __init__(self, *args, stats: tuple = (5, 2, 0, 4), character: str = '@',
+    def __init__(self, *args, stats: tuple = (99, 2, 0, 4), character: str = '@',
                  **kwargs):
         kwargs.update({'stats': stats, 'character': character})
         super().__init__(*args, **kwargs)
@@ -71,6 +70,9 @@ class Player(Fighter):
         if self.move_counter == 0:
             self.velocity = vector([kp[K_d] - kp[K_a],
                                     kp[K_s] - kp[K_w]])
+        next_obj = self.map[self.position + self.velocity]
+        if hasattr(next_obj, 'take_damage') and next_obj is not self:
+            self.deal_damage(next_obj)
         super().update()
 
     def take_damage(self, damage: int):
