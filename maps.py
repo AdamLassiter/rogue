@@ -1,24 +1,23 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 
-from random import shuffle, choice, randint, randrange
+from random import shuffle, choice, randrange
 import resource
 import sys
 from typing import *
 
+import pygame
+from numpy import array, concatenate, set_printoptions, inf
+
 from constants import *
-from objects import Object
+from objects import UpdateDrawable
 from tiles import Wall, Dirt, Bonfire
-from fighters import Troll, Gorgon, Wizard
+from fighters import Goblin, Gorgon, Wizard
 from pickups import Ladder, Sword
 from vector import vector
 
-import pygame
-import numpy
-from numpy import array, concatenate
-
 resource.setrlimit(resource.RLIMIT_STACK, (2**29, -1))
 sys.setrecursionlimit(10**6)
-numpy.set_printoptions(threshold=numpy.inf)
+set_printoptions(threshold=inf)
 pygame.init()
 
 
@@ -49,10 +48,10 @@ class Room:
         return (slice(self.x1 + 1, self.x2, None), slice(self.y1 + 1, self.y2))
 
 
-class Map:
+class Map(metaclass=UpdateDrawable):
 
-    def __init__(self, player_ref, size: vector, from_map: array = None):
-        self.player = player_ref
+    def __init__(self, game_ref, size: vector, from_map: array = None):
+        self.game = game_ref
         self.size = size
         self.player_start = None
         self.effects = []
@@ -86,18 +85,18 @@ class Map:
         raise NotImplementedError
 
     def draw(self, surface: pygame.Surface):
-        x0, y0 = position = self.player.position
+        x0, y0 = position = self.game.player.position
         xc, yc = position - GAME_CENTER
         mslice = self[xc:xc + GAME_SPRITE_WIDTH, yc:yc + GAME_SPRITE_HEIGHT]
-        MapSlice(self.player, mslice).draw(surface)
+        MapSlice(self.game.player, mslice).draw(surface)
         for effect in self.effects:
             effect.draw(surface)
 
     def update(self):
-        x0, y0 = position = self.player.position
+        x0, y0 = position = self.game.player.position
         xc, yc = position - GAME_CENTER
         mslice = self[xc:xc + GAME_SPRITE_WIDTH, yc:yc + GAME_SPRITE_HEIGHT]
-        MapSlice(self.player, mslice).update()
+        MapSlice(self.game.player, mslice).update()
         for effect in self.effects:
             effect.update()
 
@@ -148,10 +147,10 @@ class Maze(Map):
             return mapdat
 
         mapdat = make_maze(*self.size)
-        w = lambda x, y: Wall(self.player, self, vector([x, y]))
-        d = lambda x, y: Dirt(self.player, self, vector([x, y]))
-        _map = [[w(x, y) if mapdat[y][x] == '#'
-                 or x+1 in self.size or y+1 in self.size
+        w = lambda x, y: Wall(self.game, vector([x, y]))
+        d = lambda x, y: Dirt(self.game, vector([x, y]))
+        _map = [[w(x, y) if mapdat[y][x] == '#' or
+                 x + 1 in self.size or y + 1 in self.size
                  else d(x, y)
                  for x in range(self.size[0])] for y in range(self.size[1])]
         self.map = array(_map, ndmin=2)
@@ -163,25 +162,26 @@ class Dungeon(Maze):
 
     def populate(self):
         self.player_start = self.rooms[0].center
-        self[self.player_start] = Bonfire(self.player, self, self.player_start)
+        self[self.player_start] = Bonfire(self.game, self.player_start)
 
         items = [Ladder, Sword]
         for Item, room in zip(items, self.rooms[1:]):
-            pos = vector([randrange(room.x1+1, room.x2),
-                          randrange(room.y1+1, room.y2)])
-            Item(self.player, self, pos).spawn()
+            pos = vector([randrange(room.x1 + 1, room.x2),
+                          randrange(room.y1 + 1, room.y2)])
+            Item(self.game, pos).spawn()
 
         for room in self.rooms[len(items) + 1:]:
-            Spawn = choice([Troll, Wizard, Gorgon])
-            pos = vector([randrange(room.x1+1, room.x2),
-                          randrange(room.y1+1, room.y2)])
-            self[pos] = Spawn(self.player, self, pos)
+            Spawn = choice([Goblin, Wizard, Gorgon])
+            pos = vector([randrange(room.x1 + 1, room.x2),
+                          randrange(room.y1 + 1, room.y2)])
+            self[pos] = Spawn(self.game, pos)
 
     def gen_map(self):
         super().gen_map()
-        br_x, br_y = self.size - (ROOM_MIN_SIZE + 1)
+        br_x, br_y = self.size - ROOM_MIN_SIZE
         self.rooms = [Room(0, 0, ROOM_MIN_SIZE, ROOM_MIN_SIZE),
                       Room(br_x, br_y, ROOM_MIN_SIZE, ROOM_MIN_SIZE)]
+
         for _ in range(Dungeon.ATTEMPTS):
             width = randrange(ROOM_MIN_SIZE, ROOM_MAX_SIZE, 2)
             height = randrange(ROOM_MIN_SIZE, ROOM_MAX_SIZE, 2)
@@ -190,8 +190,8 @@ class Dungeon(Maze):
             room = Room(x, y, width, height)
             if not any(map(room.overlaps, self.rooms)):
                 self.rooms.append(room)
+
         for room in self.rooms:
-            self[room.slice] = [[Dirt(self.player, self, vector([x, y]))
+            self[room.slice] = [[Dirt(self.game, vector([x, y]))
                                  for x in range(room.x1 + 1, room.x2)]
                                 for y in range(room.y1 + 1, room.y2)]
-        self.populate()

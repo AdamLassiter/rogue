@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 
 from copy import copy
 
@@ -19,17 +19,18 @@ class Game:
     def __init__(self):
         self.main_surf = pygame.display.set_mode((GAME_PIXEL_WIDTH,
                                                   GAME_PIXEL_HEIGHT))
-        self.savestate = []
+        self.inventory_save = []
         self.init(Dungeon)
 
     def init(self, Maptype):
-        self.player = p = Player(None, None, None)
-        self.map = m = Maptype(p, vector([31, 31]))
-        Player.__init__(p, p, m, m.player_start)
-        for item in self.savestate:
-            item.player = p
+        self.player = p = Player(None, None)
+        self.map = m = Maptype(self, vector([41, 41]))
+        m.populate()
+        Player.__init__(p, self, m.player_start)
+        for item in self.inventory_save:
+            item.player, item.map = p, m
             item.pickup()
-        self.hud = Hud(self.player, lambda: str(self.savestate))
+        self.hud = Hud(self)
 
     def draw(self):
         self.main_surf.fill(BLACK)
@@ -51,22 +52,23 @@ class Game:
             elif event.type == pygame.KEYDOWN:
                 if event.key in [K_ESCAPE, KMOD_LALT | K_F4]:
                     self.state = 'quit'
+                if event.key == K_m:
+                    print(self.map)
             elif event.type == LADDER_EVENT:
                 self.state = 'quit'
             elif event.type == PLAYER_KILL:
                 self.init(type(self.map))
                 pygame.event.clear()
             elif event.type == BONFIRE_EVENT:
-                self.savestate = copy(self.player.inventory)
+                p = self.player
+                self.inventory_save = copy(p.inventory)
 
     def main_loop(self):
         self.state = 'play'
         fps = pygame.time.Clock()
         while self.state == 'play':
             fps.tick(8)
-            # update gamestate
             self.update()
-            # draw everything
             self.draw()
         # exit
         pygame.quit()

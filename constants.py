@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 
 from pygame import USEREVENT
 
@@ -15,6 +15,8 @@ BLUE = (0, 0, 255)
 YELLOW = (200, 200, 0)
 PURPLE = (200, 0, 200)
 
+FONT_FILE = lambda: open('./DejaVuSansMono.ttf', 'rb')
+
 ROOM_MIN_SIZE = 6
 ROOM_MAX_SIZE = 12
 ROOM_MAX_MONSTER = 3
@@ -22,6 +24,7 @@ ROOM_MAX_MONSTER = 3
 PLAYER_KILL = USEREVENT + 1
 LADDER_EVENT = USEREVENT + 2
 BONFIRE_EVENT = USEREVENT + 3
+HUD_MESSAGE = USEREVENT + 4
 
 GAME_PIXEL_WIDTH = 960
 GAME_PIXEL_HEIGHT = 540

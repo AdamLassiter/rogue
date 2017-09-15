@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 
 from random import randrange
 
@@ -11,22 +11,30 @@ from vector import vector
 pygame.init()
 
 
-class Object(object):
-    FONT = pygame.font.Font('./DejaVuSansMono.ttf', OBJECT_SIZE)
+class UpdateDrawable(type):
 
-    def __init__(self, player_ref, map_ref, position: vector, character: str = '',
+    def __new__(mcs, name, bases, body):
+        for prop in ['update', 'draw']:
+            if prop not in body and not any(map(lambda x: hasattr(x, prop), bases)):
+                raise TypeError('Derived class (%s) is not %sable' % (name, prop))
+            return super().__new__(mcs, name, bases, body)
+
+
+class Object(object, metaclass=UpdateDrawable):
+    FONT = pygame.font.Font(FONT_FILE(), OBJECT_SIZE)
+
+    def __init__(self, game_ref, position: vector, character: str = '',
                  color: tuple = WHITE, solid: bool = True, transparent: bool = None):
-         self.player = player_ref
-         self.map = map_ref
-         self.char = character
-         color = tuple(map(lambda x: 0 if x < 0 else 255 if x > 255 else x,
-                           map(lambda x: x * randrange(90, 110) / 100, color)))
-         self.character = Object.FONT.render(character, False, color).convert()
-         self.position = position
-         self.solid = solid
-         self.transparent = not solid if transparent is None else transparent
-         self.velocity = vector([0, 0])
-         self.__d_alpha = False
+        self.game = game_ref
+        self.char = character
+        color = tuple(map(lambda x: 0 if x < 0 else 255 if x > 255 else x,
+                          map(lambda x: x * randrange(90, 110) / 100, color)))
+        self.character = Object.FONT.render(character, False, color).convert()
+        self.position = position
+        self.solid = solid
+        self.transparent = not solid if transparent is None else transparent
+        self.velocity = vector([0, 0])
+        self.__d_alpha = False
 
     @property
     def alpha(self):
@@ -45,17 +53,17 @@ class Object(object):
         if hasattr(self, 'explored'):
             visible = getattr(self, 'explored')
         else:
-            visible = self.visible(self.player.position)
+            visible = self.visible(self.game.player.position)
         return self.char if visible else ' '
 
     @staticmethod
     def dist(objA: tuple, objB: tuple) -> float:
-         x1, y1 = objA
-         x2, y2 = objB
-         return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
+        x1, y1 = objA
+        x2, y2 = objB
+        return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
 
     def draw(self, surface: pygame.Surface):
-        position = self.position - self.player.position
+        position = self.position - self.game.player.position
         alpha = 255 / (Object.dist((0, 0), position) / OBJECT_SHADOW + 1) ** 2
         if self.alpha < alpha or not self.__d_alpha:
             self.alpha = alpha
@@ -97,11 +105,11 @@ class Object(object):
         if self.position == other_position:
             return True
         line_of_sight = self.bresenham(self.position, other_position)[1:-1]
-        if all([self.map[x].transparent for x in line_of_sight]):
+        if all([self.game.map[x].transparent for x in line_of_sight]):
             return Object.dist(self.position, other_position)
         return False
 
     def update(self):
-        if not self.map[self.position + self.velocity].solid:
+        if not self.game.map[self.position + self.velocity].solid:
             self.position += self.velocity
         self.velocity = vector([0, 0])

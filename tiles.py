@@ -1,4 +1,4 @@
-#! /usr/bin/python3
+#! /usr/bin/env python3
 
 import pygame
 from pygame.locals import *
@@ -6,7 +6,6 @@ from pygame.locals import *
 from constants import *
 from effects import BonfireFlame
 from objects import Object
-from vector import vector
 
 pygame.init()
 
@@ -18,14 +17,14 @@ class Tile(Object):
         self.explored = False
 
     def draw(self, surface: pygame.Surface):
-        if self.visible(self.player.position):
+        if self.visible(self.game.player.position):
             super().draw(surface)
         elif self.explored:
             self.alpha = 64
             super().draw(surface)
 
     def update(self):
-        if self.visible(self.player.position):
+        if self.visible(self.game.player.position):
             self.explored = True
 
 
@@ -57,8 +56,8 @@ class Bonfire(Tile):
         super().draw(surface)
 
     def update(self):
-        if self.position == self.player.position:
+        if self.position == self.game.player.position:
             pygame.event.post(pygame.event.Event(BONFIRE_EVENT, {}))
         for _ in range(3):
-            BonfireFlame(self.player, self.map, self.position).spawn()
+            BonfireFlame(self.game, self.position).spawn()
         super().update()
