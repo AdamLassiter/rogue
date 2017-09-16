@@ -10,12 +10,12 @@ class vector(list):
         return vector(list(self) + list(other))
 
     def __eq__(self, other):
-        if isinstance(other, vector):
+        if isinstance(other, (vector, list, tuple)):
             return all(map(lambda x, y: x == y, self, other))
         return False
 
     def __add__(self, other):
-        if isinstance(other, vector):
+        if isinstance(other, (vector, list, tuple)):
             return vector(map(lambda x, y: x + y, self, other))
         return vector(map(lambda x: x + other, self))
 
@@ -26,24 +26,27 @@ class vector(list):
         return vector(map(lambda x: -x, self))
 
     def __sub__(self, other):
-        return self + other.__neg__()
+        if isinstance(other, (vector, list, tuple)):
+            return self + (-x for x in other)
+        else:
+            return self + other.__neg__()
 
     def __mul__(self, other):
-        if isinstance(other, vector):
+        if isinstance(other, (vector, list, tuple)):
             return vector(map(lambda x, y: x * y, self, other))
         return vector(map(lambda x: x * other, self))
 
     def __truediv__(self, other):
-        if isinstance(other, vector):
+        if isinstance(other, (vector, list, tuple)):
             return vector(map(lambda x, y: x / y, self, other))
         return vector(map(lambda x: x / other, self))
 
     def __floordiv__(self, other):
-        if isinstance(other, vector):
+        if isinstance(other, (vector, list, tuple)):
             return vector(map(lambda x, y: x // y, self, other))
         return vector(map(lambda x: x // other, self))
 
     def __pow__(self, other):
-        if isinstance(other, vector):
+        if isinstance(other, (vector, list, tuple)):
             return vector(map(lambda x, y: x ** y, self, other))
         return vector(map(lambda x: x // other, self))
