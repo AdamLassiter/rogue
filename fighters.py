@@ -2,26 +2,13 @@
 
 from random import randrange
 
-import pygame
-from pygame.locals import *
-
 from constants import *
 from objects import Object
 from effects import HitMarker, StoneGlare, Fireball
 from vector import vector
 
-pygame.init()
-
 
 class Fighter(Object):
-
-    def __setattr__(self, name, value):
-        if name == 'position' and value is not None:
-            if self.underneath is not None:
-                self.game.map[self.position] = self.underneath
-            self.underneath = self.game.map[value]
-            self.game.map[value] = self
-        super().__setattr__(name, value)
 
     def __init__(self, *args, stats: tuple = (0, 0, 0, 0), transparent: bool = True,
                  **kwargs):
@@ -32,11 +19,24 @@ class Fighter(Object):
         super().__init__(*args, **kwargs)
         self.move_counter = 1
 
-    def draw(self, surface: pygame.Surface):
+    def _get_position(self):
+        return super()._get_position()
+
+    def _set_position(self, v: vector):
+        if self.underneath is not None:
+            self.game.map[self.position] = self.underneath
+        self.underneath = self.game.map[v]
+        self.game.map[v] = self
+        super()._set_position(v)
+
+    position = property(_get_position, _set_position)
+
+    @property
+    def render(self):
         if self.visible(self.game.player.position):
-            super().draw(surface)
+            return super().render
         else:
-            self.underneath.draw(surface)
+            return None
 
     def update(self):
         if self.move_counter == 0:
@@ -59,35 +59,35 @@ class Fighter(Object):
 
 class Player(Fighter):
 
-    def __init__(self, *args, stats: tuple = (99, 1, 0, 4), character: str = '@',
+    def __init__(self, *args, stats: tuple = (99, 1, 0, 4), sprite: str = '@',
                  **kwargs):
-        kwargs.update({'stats': stats, 'character': character})
+        kwargs.update({'stats': stats, 'sprite': sprite})
         super().__init__(*args, **kwargs)
         self.inventory = []
 
     def update(self):
-        self.keypresses = kp = list(map(int, pygame.key.get_pressed()))
+        kp = self.game.keypresses
         if self.move_counter == 0:
-            self.velocity = vector([kp[K_d] - kp[K_a],
-                                    kp[K_s] - kp[K_w]])
+            self.velocity = vector([kp.get('d', 0) - kp.get('a', 0),
+                                    kp.get('s', 0) - kp.get('w', 0),
+                                    0])
         next_obj = self.game.map[self.position + self.velocity]
         if hasattr(next_obj, 'take_damage') and next_obj is not self:
             self.deal_damage(next_obj)
         super().update()
 
     def take_damage(self, damage: int):
-        pygame.event.post(pygame.event.Event(HUD_MESSAGE,
-                                             {'text': 'took %s damage' % damage}))
+        # self.game.events.append(HUD_MESSAGE)
         super().take_damage(damage)
         if self.hp <= 0:
-            pygame.event.post(pygame.event.Event(PLAYER_KILL, {}))
+            self.game.events.append(PLAYER_KILL)
 
 
 class Goblin(Fighter):
 
-    def __init__(self, *args, stats: tuple = (1, 1, 0, 2), character: str = 'g',
-                 color: tuple = GREEN, **kwargs):
-        kwargs.update({'stats': stats, 'character': character, 'color': color})
+    def __init__(self, *args, stats: tuple = (1, 1, 0, 2), sprite: str = 'g',
+                 **kwargs):
+        kwargs.update({'stats': stats, 'sprite': sprite})
         super().__init__(*args, **kwargs)
 
     def update(self):
@@ -96,31 +96,32 @@ class Goblin(Fighter):
             dist = visible
             d_pos = self.game.player.position - self.position
             if dist >= 2:
-                self.velocity = vector(map(lambda x: int(round(x / dist)), d_pos))
+                v = vector(map(lambda x: int(round(x / dist)), d_pos))
+                self.velocity = v
             elif self.game.player.hp > 0:
                 self.deal_damage(self.game.player)
             else:
                 pass
         elif self.move_counter == 0:
-            self.velocity = vector([randrange(-1, 2) for _ in range(2)])
+            self.velocity = vector([randrange(-1, 2) for _ in range(2)] + [0])
         else:
-            self.velocity = vector([0, 0])
+            self.velocity = vector([0, 0, 0])
         super().update()
 
 
 class Troll(Goblin):
 
-    def __init__(self, *args, stats: tuple = (5, 2, 2, 1), character: str = 'T',
-                 color: tuple = GREEN, **kwargs):
-        kwargs.update({'stats': stats, 'character': character, 'color': color})
+    def __init__(self, *args, stats: tuple = (5, 2, 2, 1), sprite: str = 'T',
+                 **kwargs):
+        kwargs.update({'stats': stats, 'sprite': sprite})
         super().__init__(*args, **kwargs)
 
 
 class Gorgon(Fighter):
 
-    def __init__(self, *args, stats: tuple = (5, 0, 5, 0), character: str = 'G',
-                 color: tuple = GREEN, **kwargs):
-        kwargs.update({'stats': stats, 'character': character, 'color': color})
+    def __init__(self, *args, stats: tuple = (5, 0, 5, 0), sprite: str = 'G',
+                 **kwargs):
+        kwargs.update({'stats': stats, 'sprite': sprite})
         super().__init__(*args, **kwargs)
         self.explored = False
 
@@ -135,9 +136,9 @@ class Gorgon(Fighter):
 
 class Wizard(Fighter):
 
-    def __init__(self, *args, stats: tuple = (3, 1, 0, 2), character: str = 'W',
-                 color: tuple = PURPLE, **kwargs):
-        kwargs.update({'stats': stats, 'character': character, 'color': color})
+    def __init__(self, *args, stats: tuple = (3, 1, 0, 2), sprite: str = 'W',
+                 **kwargs):
+        kwargs.update({'stats': stats, 'sprite': sprite})
         super().__init__(*args, **kwargs)
         self.fireball_counter = 0
 
@@ -146,6 +147,6 @@ class Wizard(Fighter):
         if 0 < dist < 10 and self.move_counter == self.fireball_counter == 0:
             Fireball(self.game, self.position, parent=self).spawn()
         elif self.move_counter == 0 and not dist:
-            self.velocity = vector([randrange(-1, 2) for _ in range(2)])
+            self.velocity = vector([randrange(-1, 2) for _ in range(2)] + [0])
         self.fireball_counter = (self.fireball_counter + 1) % 5
         super().update()

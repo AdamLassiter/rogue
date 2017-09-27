@@ -1,81 +1,72 @@
 #! /usr/bin/env python3
 
-from random import randrange
-
-import pygame
-from pygame.locals import *
-
-from constants import *
+# from constants import *
+from glwrap import GlObject
 from vector import vector
 
-pygame.init()
 
-
-class UpdateDrawable(type):
+class UpdateRenderable(type):
 
     def __new__(mcs, name, bases, body):
-        for prop in ['update', 'draw']:
+        cls_ok = False
+        # Must have one of these
+        for prop in ['render', 'renders']:
+            if prop in body or any(map(lambda x: hasattr(x, prop), bases)):
+                cls_ok = True
+        # Must have all of these
+        for prop in ['update']:
             if prop not in body and not any(map(lambda x: hasattr(x, prop), bases)):
-                raise TypeError('Derived class (%s) is not %sable' % (name, prop))
+                cls_ok = False
+        if cls_ok:
             return super().__new__(mcs, name, bases, body)
+        else:
+            raise TypeError('Derived class (%s) is invalid.' % name)
 
 
-class Object(object, metaclass=UpdateDrawable):
-    FONT = pygame.font.Font(FONT_FILE(), OBJECT_SIZE)
+class Object(object, metaclass=UpdateRenderable):
 
-    def __init__(self, game_ref, position: vector, character: str = '',
-                 color: tuple = WHITE, solid: bool = True, transparent: bool = None):
+    def __init__(self, game_ref, position: vector, sprite: str = ' ',
+                 solid: bool = True, transparent: bool = None):
         self.game = game_ref
-        self.char = character
-        color = tuple(map(lambda x: 0 if x < 0 else 255 if x > 255 else x,
-                          map(lambda x: x * randrange(90, 110) / 100, color)))
-        self.character = Object.FONT.render(character, False, color).convert()
+        self.sprite = sprite
+        texid = game_ref.textures['font/%03d.png' % ord(sprite)]
+        self.gl_obj = GlObject(position, texid)
         self.position = position
         self.solid = solid
         self.transparent = not solid if transparent is None else transparent
-        self.velocity = vector([0, 0])
-        self.__d_alpha = False
+        self.velocity = vector([0, 0, 0])
 
-    @property
-    def alpha(self):
-        alpha = self.character.get_alpha()
-        return alpha if alpha is not None else 255
+    def _get_position(self):
+        return self.pos
 
-    @alpha.setter
-    def alpha(self, alpha: int):
-        assert 0 <= alpha <= 255
-        if not self.__d_alpha:
-            self.character.set_alpha(alpha)
-            self.__d_alpha = True
+    def _set_position(self, v: vector):
+        self.pos = self.gl_obj.position = v
+
+    position = property(_get_position, _set_position)
 
     def __repr__(self):
-        return self.char
+        return self.sprite
         if hasattr(self, 'explored'):
             visible = getattr(self, 'explored')
         else:
             visible = self.visible(self.game.player.position)
-        return self.char if visible else ' '
+        return self.sprite if visible else ' '
 
     @staticmethod
     def dist(objA: tuple, objB: tuple) -> float:
-        x1, y1 = objA
-        x2, y2 = objB
+        x1, y1, z1 = objA
+        x2, y2, z2 = objB
         return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
 
-    def draw(self, surface: pygame.Surface):
-        position = self.position - self.game.player.position
-        alpha = 255 / (Object.dist((0, 0), position) / OBJECT_SHADOW + 1) ** 2
-        if self.alpha < alpha or not self.__d_alpha:
-            self.alpha = alpha
-        blit_at = (position + GAME_CENTER) * OBJECT_SIZE
-        rect = self.character.get_rect(center=blit_at + OBJECT_SIZE // 2)
-        surface.blit(self.character, rect)
-        self.__d_alpha = False
+    @property
+    def render(self) -> GlObject:
+        return self.gl_obj
 
     @staticmethod
     def bresenham(start: vector, end: vector) -> list:
-        x1, y1 = start
-        x2, y2 = end
+        # TODO: Memoise 0 -> (end - start) bresenhams
+        x1, y1, z1 = start
+        x2, y2, z2 = end
         dx = x2 - x1
         dy = y2 - y1
         is_steep = abs(dy) > abs(dx)
@@ -93,7 +84,7 @@ class Object(object, metaclass=UpdateDrawable):
         y = y1
         points = []
         for x in range(x1, x2 + 1):
-            coord = vector([y, x]) if is_steep else vector([x, y])
+            coord = vector([y, x, z1]) if is_steep else vector([x, y, z1])
             points.append(coord)
             error -= abs(dy)
             if error < 0:
@@ -110,6 +101,7 @@ class Object(object, metaclass=UpdateDrawable):
         return False
 
     def update(self):
-        if not self.game.map[self.position + self.velocity].solid:
-            self.position += self.velocity
-        self.velocity = vector([0, 0])
+        if any(self.velocity):
+            if not self.game.map[self.position + self.velocity].solid:
+                self.position += self.velocity
+        self.velocity = vector([0, 0, 0])

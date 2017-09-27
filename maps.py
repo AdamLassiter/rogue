@@ -9,8 +9,8 @@ import pygame
 from numpy import array, concatenate, set_printoptions, inf
 
 from constants import *
-from objects import UpdateDrawable
-from tiles import Wall, Dirt, Bonfire
+from objects import UpdateRenderable
+from tiles import Air, Wall, Dirt, Bonfire
 from fighters import Goblin, Gorgon, Wizard
 from pickups import Ladder, Sword
 from vector import vector
@@ -37,7 +37,7 @@ class Room:
 
     @property
     def center(self) -> vector:
-        return vector([self.x1 + self.x2, self.y1 + self.y2]) // 2
+        return vector([self.x1 + self.x2, self.y1 + self.y2, 2]) // 2
 
     def overlaps(self, other) -> bool:
         return (self.x1 <= other.x2 and self.x2 >= other.x1 and
@@ -45,10 +45,12 @@ class Room:
 
     @property
     def slice(self) -> tuple:
-        return (slice(self.x1 + 1, self.x2, None), slice(self.y1 + 1, self.y2))
+        return (slice(self.x1, self.x2),
+                slice(self.y1, self.y2),
+                slice(None, None))
 
 
-class Map(metaclass=UpdateDrawable):
+class Map(metaclass=UpdateRenderable):
 
     def __init__(self, game_ref, size: vector, from_map: array = None):
         self.game = game_ref
@@ -61,62 +63,74 @@ class Map(metaclass=UpdateDrawable):
             self.gen_map()
 
     def __getitem__(self, slice_):
-        xs, ys = slice_
+        if len(slice_) == 3:
+            xs, ys, zs = slice_
+        else:
+            xs, ys = slice_
+            zs = slice(None, None)
         ret_sl = not isinstance(slice_, vector)
         if ret_sl and None not in [xs.start, xs.stop] and xs.start < 0 <= xs.stop:
-            left = self[slice(xs.start, None), ys]
-            right = self[slice(None, xs.stop), ys]
+            left = self[slice(xs.start, None), ys, zs]
+            right = self[slice(None, xs.stop), ys, zs]
             return concatenate((left, right), axis=1)
         elif ret_sl and None not in [ys.start, ys.stop] and ys.start < 0 <= ys.stop:
-            top = self[xs, slice(ys.start, None)]
-            botm = self[xs, slice(None, ys.stop)]
+            top = self[xs, slice(ys.start, None), zs]
+            botm = self[xs, slice(None, ys.stop), zs]
             return concatenate((top, botm), axis=0)
-        return self.map[ys, xs]
+        return self.map[ys, xs, zs]
 
     def __setitem__(self, slice_, value):
-        xs, ys = slice_
-        self.map[ys, xs] = value
+        if len(slice_) == 3:
+            xs, ys, zs = slice_
+        else:
+            xs, ys = slice_
+            zs = slice(None, None)
+        self.map[ys, xs, zs] = value
 
     def __repr__(self):
-        return '\n'.join([''.join([repr(tile) for tile in row])
+        return '\n'.join([''.join([repr(tile[1]) if not isinstance(tile[1], Air)
+                                   else repr(tile[0]) for tile in row])
                           for row in self.map])
 
     def gen_map(self):
         raise NotImplementedError
 
-    def draw(self, surface: pygame.Surface):
-        x0, y0 = position = self.game.player.position
-        xc, yc = position - GAME_CENTER
-        mslice = self[xc:xc + GAME_SPRITE_WIDTH, yc:yc + GAME_SPRITE_HEIGHT]
-        MapSlice(self.game.player, mslice).draw(surface)
-        for effect in self.effects:
-            effect.draw(surface)
+    @property
+    def renders(self) -> list:
+        effect_objs = [effect.render for effect in self.effects]
+        tile_objs = self.mapslice.renders
+        return effect_objs + tile_objs
 
     def update(self):
-        x0, y0 = position = self.game.player.position
-        xc, yc = position - GAME_CENTER
-        mslice = self[xc:xc + GAME_SPRITE_WIDTH, yc:yc + GAME_SPRITE_HEIGHT]
-        MapSlice(self.game.player, mslice).update()
+        xc, yc, _ = position = self.game.player.position
+        x0, y0, _ = position - vector([DISP_WIDTH, DISP_HEIGHT, 0]) // 2
+        mslice = self[x0:x0 + DISP_WIDTH, y0:y0 + DISP_HEIGHT, :]
+        self.mapslice = MapSlice(self.game, mslice)
+        self.mapslice.update()
         for effect in self.effects:
             effect.update()
 
 
 class MapSlice(Map):
 
-    def __init__(self, player_ref, map_slice: array):
-        size = vector([len(map_slice[0]), len(map_slice)])
-        super().__init__(player_ref, size, from_map=map_slice)
+    def __init__(self, game_ref, map_slice: array):
+        size = vector([len(map_slice[0]), len(map_slice), len(map_slice[0, 0])])
+        super().__init__(game_ref, size, from_map=map_slice)
 
-    def draw(self, surface: pygame.Surface):
-        # print(self.map)
+    @property
+    def renders(self) -> list:
+        tile_vecs = []
         for row in self.map:
-            for cell in row:
-                cell.draw(surface)
+            for column in row:
+                for cell in column:
+                    tile_vecs.append(cell.render)
+        return tile_vecs
 
     def update(self):
         for row in self.map.copy():
-            for cell in row:
-                cell.update()
+            for column in row:
+                for cell in column:
+                    cell.update()
 
 
 class Maze(Map):
@@ -146,15 +160,22 @@ class Maze(Map):
                 mapdat.extend([''.join(x) for x in rrow])
             return mapdat
 
-        mapdat = make_maze(*self.size)
-        w = lambda x, y: Wall(self.game, vector([x, y]))
-        d = lambda x, y: Dirt(self.game, vector([x, y]))
+        mapdat = make_maze(self.size[0], self.size[1])
+        w = lambda x, y: [Wall(self.game, vector([x, y, z]))
+                          for z in range(self.size[2])]
+        d = lambda x, y: [Dirt(self.game, vector([x, y, 0]))] + \
+                         [Air(self.game, vector([x, y, z]))
+                          for z in range(1, self.size[2])]
+        x_max, y_max, z_max = self.size
         _map = [[w(x, y) if mapdat[y][x] == '#' or
-                 x + 1 in self.size or y + 1 in self.size
+                 x + 1 == x_max or y + 1 == y_max
                  else d(x, y)
                  for x in range(self.size[0])] for y in range(self.size[1])]
-        self.map = array(_map, ndmin=2)
-        self.player_start = vector([1, 1])
+        self.map = array(_map, ndmin=3)
+        self.player_start = vector([1, 1, 1])
+
+    def populate(self):
+        pass
 
 
 class Dungeon(Maze):
@@ -166,32 +187,35 @@ class Dungeon(Maze):
 
         items = [Ladder, Sword]
         for Item, room in zip(items, self.rooms[1:]):
-            pos = vector([randrange(room.x1 + 1, room.x2),
-                          randrange(room.y1 + 1, room.y2)])
+            pos = vector([randrange(room.x1, room.x2),
+                          randrange(room.y1, room.y2),
+                          1])
             Item(self.game, pos).spawn()
 
         for room in self.rooms[len(items) + 1:]:
             Spawn = choice([Goblin, Wizard, Gorgon])
-            pos = vector([randrange(room.x1 + 1, room.x2),
-                          randrange(room.y1 + 1, room.y2)])
+            pos = vector([randrange(room.x1, room.x2),
+                          randrange(room.y1, room.y2),
+                          1])
             self[pos] = Spawn(self.game, pos)
 
     def gen_map(self):
         super().gen_map()
-        br_x, br_y = self.size - ROOM_MIN_SIZE
-        self.rooms = [Room(0, 0, ROOM_MIN_SIZE, ROOM_MIN_SIZE),
+        br_x, br_y, _ = self.size - ROOM_MIN_SIZE
+        self.rooms = [Room(1, 1, ROOM_MIN_SIZE, ROOM_MIN_SIZE),
                       Room(br_x, br_y, ROOM_MIN_SIZE, ROOM_MIN_SIZE)]
 
         for _ in range(Dungeon.ATTEMPTS):
             width = randrange(ROOM_MIN_SIZE, ROOM_MAX_SIZE, 2)
             height = randrange(ROOM_MIN_SIZE, ROOM_MAX_SIZE, 2)
-            x = randrange(0, self.size[0] - width, 2)
-            y = randrange(0, self.size[1] - height, 2)
+            x = randrange(1, self.size[0] - width, 2)
+            y = randrange(1, self.size[1] - height, 2)
             room = Room(x, y, width, height)
             if not any(map(room.overlaps, self.rooms)):
                 self.rooms.append(room)
 
         for room in self.rooms:
-            self[room.slice] = [[Dirt(self.game, vector([x, y]))
-                                 for x in range(room.x1 + 1, room.x2)]
-                                for y in range(room.y1 + 1, room.y2)]
+            self[room.slice] = [[[Dirt(self.game, vector([x, y, 0])),
+                                  Air(self.game, vector([x, y, 1]))]
+                                 for x in range(room.x1, room.x2)]
+                                for y in range(room.y1, room.y2)]

@@ -1,12 +1,7 @@
 #! /usr/bin/env python3
 
-import pygame
-from pygame.locals import *
-
 from constants import *
 from effects import Effect
-
-pygame.init()
 
 
 class Pickup(Effect):
@@ -22,9 +17,12 @@ class Pickup(Effect):
     def drop(self):
         self.spawn()
 
-    def draw(self, surface: pygame.Surface):
+    @property
+    def render(self):
         if self.visible(self.game.player.position):
-            super().draw(surface)
+            return super().render
+        else:
+            return None
 
     def update(self):
         if self.game.player.position == self.position:
@@ -33,21 +31,20 @@ class Pickup(Effect):
 
 class Ladder(Pickup):
 
-    def __init__(self, *args, character: str = 'H', color: tuple = YELLOW, **kwargs):
-        kwargs.update({'character': character, 'color': color})
+    def __init__(self, *args, sprite: str = 'H', **kwargs):
+        kwargs.update({'sprite': sprite})
         super().__init__(*args, **kwargs)
 
     def update(self):
         if self.game.player.position == self.position:
-            pygame.event.post(pygame.event.Event(LADDER_EVENT, {'ladder': self}))
+            self.game.events.append(LADDER_EVENT)
         super().update()
 
 
 class Sword(Pickup):
 
-    def __init__(self, *args, character: str = '/', color: tuple = GREY, **kwargs):
-        kwargs.update({'character': character, 'color': color})
-        self.attacks = ['|', '-', '/', '\\']
+    def __init__(self, *args, sprite: str = '/', **kwargs):
+        kwargs.update({'sprite': sprite})
         super().__init__(*args, **kwargs)
 
     def pickup(self):

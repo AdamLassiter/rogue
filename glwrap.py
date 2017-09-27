@@ -1,9 +1,12 @@
 #! /usr/bin/env python3
 
 from functools import wraps
+from multiprocessing import Process
+from threading import Thread
 from time import time
 
 from OpenGL.GL import *
+# from OpenGL.arrays import vbo
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 from PIL import Image
@@ -11,72 +14,141 @@ from PIL import Image
 from vector import vector
 
 
-class Cube:
-    vertices = ((0.5, 0.5, -0.5),
-                (-0.5, 0.5, -0.5),
-                (-0.5, 0.5, 0.5),
-                (0.5, 0.5, 0.5),
-                (0.5, -0.5, 0.5),
-                (-0.5, -0.5, 0.5),
-                (-0.5, -0.5, -0.5),
-                (0.5, -0.5, -0.5))
-    corners = ((0.0, 0.0),
-               (1.0, 0.0),
-               (1.0, 1.0),
-               (0.0, 1.0))
+class GlObject:
+    vertices = ((0.45, 0.45, -0.45),
+                (-0.45, 0.45, -0.45),
+                (-0.45, 0.45, 0.45),
+                (0.45, 0.45, 0.45),
+                (0.45, -0.45, 0.45),
+                (-0.45, -0.45, 0.45),
+                (-0.45, -0.45, -0.45),
+                (0.45, -0.45, -0.45))
+    corners = ((1.0, 1.0),
+               (0.0, 1.0),
+               (0.0, 0.0),
+               (1.0, 0.0))
     surfaces = ((0, 1, 2, 3),
-                (4, 5, 6, 7),
-                (2, 3, 4, 5),
-                (6, 7, 0, 1),
-                (1, 2, 5, 6),
-                (0, 3, 4, 7))
+                # (7, 6, 5, 4),
+                # (3, 2, 5, 4),
+                # (1, 0, 7, 6),
+                # (1, 2, 5, 6),
+                # (3, 0, 7, 4),
+                )
 
     def __init__(self, centre: vector, texid: int):
-        self.position = vector([0, 0, 0])
-        self.vertices = Cube.vertices
-        self.translate(centre)
+        self.position = vector(centre)
         self.texture = texid
 
     def draw(self):
         glBindTexture(GL_TEXTURE_2D, self.texture)
         glBegin(GL_QUADS)
-        for vertex_ids in Cube.surfaces:
-            for tex_coord, vertex in zip(Cube.corners, vertex_ids):
+        for vertex_ids in GlObject.surfaces:
+            for tex_coord, vertex in zip(GlObject.corners, vertex_ids):
                 glTexCoord2f(*tex_coord)
                 glVertex3f(*self.vertices[vertex])
         glEnd()
 
-    def translate(self, v: vector):
-        self.position += v
-        self.vertices = tuple(tuple(map(sum, zip(vertex, v)))
-                              for vertex in self.vertices)
+    @property
+    def position(self):
+        return self.pos
+
+    @position.setter
+    def position(self, v: vector):
+        x, y, z = v
+        self.pos = vector([x, z, y])
+        self.vertices = tuple(tuple(map(sum, zip(vertex, self.pos)))
+                              for vertex in GlObject.vertices)
+
+
+@wraps
+class Memoize:
+    def __init__(self, f):
+        self.f = f
+        self.memo = {}
+
+    def __call__(self, *args, **kwargs):
+        if args not in self.memo:
+            self.memo[args] = self.f(*args, **kwargs)
+        return self.memo[args]
+
+
+def renderer(func):
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        self.fps, dtime = time(), time() - self.fps
+        glutSetWindowTitle("FPS: %02d" % (1 / dtime,))
+        # glUseProgram(SHADER)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        glLoadIdentity()
+        gluLookAt(*self.camera_offset,
+                  *(0.0, 0.0, 0.0),
+                  *(0.0, 1.0, 0.0))
+        glRotatef(self.camera_rot[1], -1.0, 0.0, 0.0)
+        glRotatef(self.camera_rot[0], 0.0, 1.0, 0.0)
+        glTranslatef(*(self.camera_pos))
+        func(self, *args, **kwargs)
+        glutSwapBuffers()
+    return wrapper
+
+
+def multiprocess(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        process = Process(target=func, args=args, kwargs=kwargs)
+        process.start()
+        return process
+    return wrapper
+
+
+def thread(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        process = Thread(target=func, args=args, kwargs=kwargs)
+        process.start()
+        return process
+    return wrapper
+
+
+def timeit(method):
+    from time import time
+
+    def timed(*args, **kw):
+        ts = time()
+        result = method(*args, **kw)
+        te = time()
+        print(te - ts)
+        return result
+    return timed
 
 
 class GlManager:
 
-    @wraps
-    class Memoize:
-        def __init__(self, f):
-            self.f = f
-            self.memo = {}
+    def __init__(self, pipe, width: int, height: int, fov=45.0, depth=50.0):
+        self.pipe = pipe
+        self.fps = time()
+        self.camera_pos = vector([0.0, 0.0, 0.0])
+        self.camera_offset = vector([0, 10.0, -10.0])
+        self.camera_rot = [180.0, 0.0]
+        self.textures = {}
+        self.keypresses = {}
+        self.renders = []
+        # OpenGL stuff
+        self.width, self.height = width, height
+        self.fov, self.depth = fov, depth
 
-        def __call__(self, *args, **kwargs):
-            if args not in self.memo:
-                print(args)
-                self.memo[args] = self.f(*args, **kwargs)
-            return self.memo[args]
-
-    def __init__(self, width: int, height: int, fov=45.0, depth=100.0):
+    def gl_init(self):
         glutInit()
         glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
-        glutInitWindowSize(width, height)
+        glutInitWindowSize(self.width, self.height)
         glutInitWindowPosition(200, 200)
         glutCreateWindow('')
         glutSetCursor(GLUT_CURSOR_NONE)
-        glutDisplayFunc(self.draw)
-        glutIdleFunc(self.draw)
+        glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF)
+        glutKeyboardFunc(self.key_down)
+        glutKeyboardUpFunc(self.key_up)
         glutPassiveMotionFunc(self.mouse_move)
-        glutKeyboardFunc(self.keypress)
+        glutIdleFunc(self.update)
+        glutDisplayFunc(self.update)
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClearDepth(1.0)
         glDepthFunc(GL_LESS)
@@ -84,14 +156,58 @@ class GlManager:
         glShadeModel(GL_SMOOTH)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
-        gluPerspective(fov, float(width) / float(height), 0.1, depth)
+        gluPerspective(self.fov, float(self.width) / float(self.height),
+                       0.1, self.depth)
         glMatrixMode(GL_MODELVIEW)
-        # Python stuff
-        self.fps = time()
-        self.camera_pos = [0.0, 15.0, -15.0]
-        self.camera_rot = [0.0, 0.0]
-        self.objects = []
-        self.textures = {}
+
+    def key_down(self, char, x, y):
+        self.keypresses[char.decode('utf-8')] = 1
+
+    def key_up(self, char, x, y):
+        self.keypresses[char.decode('utf-8')] = 0
+
+    def mouse_move(self, x, y):
+        if x == 400 and y == 300:
+            pass
+        else:
+            glutWarpPointer(400, 300)
+            self.camera_rot[0] += (x - 400) / 10
+            self.camera_rot[1] += (y - 300) / 10
+        if self.camera_rot[1] > 45.0:
+            self.camera_rot[1] = 45.0
+        if self.camera_rot[1] < -45.0:
+            self.camera_rot[1] = -45.0
+
+    def camera_move(pos_lambda):
+        def camera(*args):
+            x, y, z = pos_lambda() * (-1, -1, 1)
+            self.camera_pos = vector([x, z, y])
+            self.camera_move(func)
+            glutTimerFunc(1000 // 60, camera, 0)
+        return camera
+
+    @renderer
+    def render(self):
+        for obj in self.renders:
+            if obj is not None:
+                obj.draw()
+        # self.hud.render()
+
+    def update(self):
+        if self.pipe.poll():
+            req = self.pipe.recv()
+            if req == 'keypresses':
+                self.pipe.send(self.keypresses)
+            elif req == 'render':
+                self.renders, self.state, (x, y, z) = self.pipe.recv()
+                self.camera_pos = vector([-x, z, -y])
+                if self.state == 'quit':
+                    glutLeaveMainLoop()
+            elif req == 'textures':
+                for i in range(32, 128):
+                    self.texture('font/%03d.png' % i)
+                self.pipe.send(self.textures)
+        self.render()
 
     @Memoize
     def texture(self, path: str):
@@ -107,47 +223,13 @@ class GlManager:
         self.textures[path] = texid
         return texid
 
-    def draw(self):
-        self.fps, dtime = time(), time() - self.fps
-        glutSetWindowTitle("FPS: %02d" % (1 / dtime,))
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        glLoadIdentity()
-        gluLookAt(*self.camera_pos, *(0, 0, 0), *(0, 1, 0))
-        glRotatef(self.camera_rot[1], -1.0, 0.0, 0.0)
-        glRotatef(self.camera_rot[0], 0.0, 1.0, 0.0)
-        for obj in self.objects:
-            obj.draw()
-        glutSwapBuffers()
+    def quit(self):
+        glutDestroyWindow(glutGetWindow())
+        sys.exit()
 
-    def keypress(self, *args):
-        if args[0] == '\033':
-            glutDestroyWindow()
-            sys.exit()
-
-    def mouse_move(self, x, y):
-        if x == 400 and y == 300:
-            pass
-        else:
-            glutWarpPointer(400, 300)
-            self.camera_rot[0] += (x - 400) / 10
-            self.camera_rot[1] += (y - 300) / 10
-        if self.camera_rot[1] > 45.0:
-            self.camera_rot[1] = 45.0
-        if self.camera_rot[1] < -45.0:
-            self.camera_rot[1] = -45.0
-
+    @multiprocess
     def loop(self):
-        glutFullScreen()
+        self.gl_init()
+        # glutFullScreen()
         glutMainLoop()
-
-    def add(self, obj):
-        self.objects.append(obj)
-
-
-if __name__ == '__main__':
-    mgr = GlManager(1280, 720, depth=100)
-    for x in range(-10, 11):
-        for z in range(-10, 11):
-            mgr.add(Cube((x, 0.0, z),
-                         mgr.texture('t1.png' if (x + z) % 2 else 't2.png')))
-    mgr.loop()
+        self.quit()

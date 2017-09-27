@@ -1,6 +1,5 @@
 #! /usr/bin/env python3
 
-import pygame
 from numpy import array
 
 from constants import *
@@ -11,7 +10,6 @@ pygame.init()
 
 
 class Label(metaclass=UpdateDrawable):
-    FONT = Object.FONT
 
     def __init__(self, position: vector, label: str, value, color: tuple = WHITE):
         self.position = position

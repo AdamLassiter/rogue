@@ -1,83 +1,67 @@
 #! /usr/bin/env python3
 
 from copy import copy
-
-import pygame
-from pygame.locals import *
+from multiprocessing import Pipe
+from time import sleep, time
 
 from constants import *
-from hud import Hud
+from glwrap import GlManager
+# from hud import Hud
 from maps import Dungeon
 from fighters import Player
 from vector import vector
 
-pygame.init()
 
+class GameManager:
 
-class Game:
-
-    def __init__(self):
-        self.main_surf = pygame.display.set_mode((GAME_PIXEL_WIDTH,
-                                                  GAME_PIXEL_HEIGHT))
+    def __init__(self, pipe):
+        self.pipe = pipe
         self.inventory_save = []
+        self.state = 'game'
+        self.keypresses = {}
+        self.render_objs = []
         self.init(Dungeon)
 
     def init(self, Maptype):
-        self.player = p = Player(None, None)
-        self.map = m = Maptype(self, vector([41, 41]))
-        m.populate()
-        Player.__init__(p, self, m.player_start)
+        self.events = []
+        self.pipe.send('textures')
+        self.textures = self.pipe.recv()
+        self.map = Maptype(self, vector([41, 41, 2]))
+        self.map.populate()
+        self.player = Player(self, self.map.player_start)
         for item in self.inventory_save:
-            item.player, item.map = p, m
-            item.pickup()
-        self.hud = Hud(self)
-
-    def draw(self):
-        self.main_surf.fill(BLACK)
-        self.map.draw(self.main_surf)
-        self.hud.draw(self.main_surf)
-        pygame.display.flip()
-        # print(self.map)
-
-    def update(self):
-        self.eval_events()
-        self.map.update()
-        self.hud.update()
+            item.game = self
+            # self.hud = Hud(self)
 
     def eval_events(self):
-        events = pygame.event.get()
-        for event in events:
-            if event.type == pygame.QUIT:
+        for i, event in enumerate(reversed(self.events)):
+            if event in (QUIT, LADDER_EVENT) or self.keypresses.get(chr(27), 0):
                 self.state = 'quit'
-            elif event.type == pygame.KEYDOWN:
-                if event.key in [K_ESCAPE, KMOD_LALT | K_F4]:
-                    self.state = 'quit'
-                if event.key == K_m:
-                    print(self.map)
-            elif event.type == LADDER_EVENT:
-                self.state = 'quit'
-            elif event.type == PLAYER_KILL:
+            elif event == PLAYER_KILL:
                 self.init(type(self.map))
-                pygame.event.clear()
-            elif event.type == BONFIRE_EVENT:
-                p = self.player
-                self.inventory_save = copy(p.inventory)
+            elif event == BONFIRE_EVENT:
+                del self.events[-i - 1]
+                self.inventory_save = copy(self.player.inventory)
 
-    def main_loop(self):
-        self.state = 'play'
-        fps = pygame.time.Clock()
-        while self.state == 'play':
-            fps.tick(8)
-            self.update()
-            self.draw()
-        # exit
-        pygame.quit()
-        exit()
+    def loop(self):
+        while self.state == 'game':
+            t0 = time()
+            self.pipe.send('keypresses')
+            self.keypresses = self.pipe.recv()
+            self.map.update()
+            self.eval_events()
+            self.pipe.send('render')
+            self.pipe.send([self.map.renders, self.state, self.player.position])
+            sleep_time = 0.125 - (t0 - time())
+            sleep(sleep_time if sleep_time > 0.1 else 0.1)
 
 
 def main():
-    game = Game()
-    game.main_loop()
+    game_pipe, gl_pipe = Pipe()
+    gl = GlManager(gl_pipe, GAME_WIDTH, GAME_HEIGHT)
+    gl.loop()
+    game = GameManager(game_pipe)
+    game.loop()
 
 
 if __name__ == '__main__':
