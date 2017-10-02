@@ -40,7 +40,7 @@ class GameManager:
             elif event == PLAYER_KILL:
                 self.init(type(self.map))
             elif event == BONFIRE_EVENT:
-                del self.events[-i - 1]
+                del self.events[self.events.index(event)]
                 self.inventory_save = copy(self.player.inventory)
 
     def loop(self):

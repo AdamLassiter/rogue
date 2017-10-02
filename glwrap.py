@@ -14,6 +14,33 @@ from PIL import Image
 from vector import vector
 
 
+class GlLight:
+    modes = (GL_AMBIENT,
+             GL_DIFFUSE,
+             GL_SPECULAR,
+             GL_EMISSIVE)
+    lights = (GL_LIGHT0,
+              GL_LIGHT1,
+              GL_LIGHT2,
+              GL_LIGHT3,
+              GL_LIGHT4,
+              GL_LIGHT5,
+              GL_LIGHT6,
+              GL_LIGHT7)
+
+    def __init__(self, centre: vector, colors: tuple,
+                 lightid: int):
+        self.position = centre
+        self.colors = colors
+        self.light = lightid
+        glEnable(lightid)
+
+    def draw(self):
+        for mode, color in zip(GlLight.modes, self.colors):
+            glLightfv(self.light, mode, color)
+        glLightfv(self.light, GL_POSITION, self.position)
+
+
 class GlObject:
     vertices = ((0.45, 0.45, -0.45),
                 (-0.45, 0.45, -0.45),
@@ -28,11 +55,11 @@ class GlObject:
                (0.0, 0.0),
                (1.0, 0.0))
     surfaces = ((0, 1, 2, 3),
-                # (7, 6, 5, 4),
-                # (3, 2, 5, 4),
-                # (1, 0, 7, 6),
-                # (1, 2, 5, 6),
-                # (3, 0, 7, 4),
+                (7, 6, 5, 4),
+                (3, 2, 5, 4),
+                (1, 0, 7, 6),
+                (1, 2, 5, 6),
+                (3, 0, 7, 4),
                 )
 
     def __init__(self, centre: vector, texid: int):
@@ -153,6 +180,7 @@ class GlManager:
         glClearDepth(1.0)
         glDepthFunc(GL_LESS)
         glEnable(GL_DEPTH_TEST)
+        glEnable(GL_LIGHTING)
         glShadeModel(GL_SMOOTH)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
