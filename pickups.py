@@ -1,12 +1,12 @@
 #! /usr/bin/env python3
 
-from constants import *
+from constants import LADDER_EVENT
 from effects import Effect
 
 
 class Pickup(Effect):
 
-    def __init__(self, *args, solid: bool = False, **kwargs):
+    def __init__(self, *args, solid: bool = False, **kwargs) -> None:
         kwargs.update({'solid': solid})
         super().__init__(*args, **kwargs)
 
@@ -31,7 +31,7 @@ class Pickup(Effect):
 
 class Ladder(Pickup):
 
-    def __init__(self, *args, sprite: str = 'H', **kwargs):
+    def __init__(self, *args, sprite: str = 'H', **kwargs) -> None:
         kwargs.update({'sprite': sprite})
         super().__init__(*args, **kwargs)
 
@@ -43,7 +43,7 @@ class Ladder(Pickup):
 
 class Sword(Pickup):
 
-    def __init__(self, *args, sprite: str = '/', **kwargs):
+    def __init__(self, *args, sprite: str = '/', **kwargs) -> None:
         kwargs.update({'sprite': sprite})
         super().__init__(*args, **kwargs)
 

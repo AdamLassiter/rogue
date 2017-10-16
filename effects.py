@@ -6,7 +6,8 @@ from vector import vector
 
 class Effect(Object):
 
-    def __init__(self, *args, solid: bool = False, transparent: bool = True, **kwargs):
+    def __init__(self, *args, solid: bool = False, transparent: bool = True,
+                 **kwargs) -> None:
         kwargs.update({'solid': solid, 'transparent': transparent})
         super().__init__(*args, **kwargs)
 
@@ -23,7 +24,7 @@ class Effect(Object):
 
 class HitMarker(Effect):
 
-    def __init__(self, *args, sprite: str = '*', **kwargs):
+    def __init__(self, *args, sprite: str = '*', **kwargs) -> None:
         kwargs.update({'sprite': sprite})
         super().__init__(*args, **kwargs)
         self.position += vector([0, 1, 0])
@@ -38,14 +39,14 @@ class HitMarker(Effect):
 
 class BonfireFlame(HitMarker):
 
-    def __init__(self, *args, sprite: str = '*', **kwargs):
+    def __init__(self, *args, sprite: str = '*', **kwargs) -> None:
         kwargs.update({'sprite': sprite})
         super().__init__(*args, **kwargs)
 
 
 class StoneGlare(Effect):
 
-    def __init__(self, *args, sprite: str = 'X', **kwargs):
+    def __init__(self, *args, sprite: str = 'X', **kwargs) -> None:
         kwargs.update({'sprite': sprite})
         super().__init__(*args, **kwargs)
         if self.game.player.speed > 0:
@@ -65,7 +66,8 @@ class StoneGlare(Effect):
 
 class Fireball(Effect):
 
-    def __init__(self, *args, parent: Object = None, sprite: str = 'o', **kwargs):
+    def __init__(self, *args, parent: Object = None, sprite: str = 'o',
+                 **kwargs) -> None:
         kwargs.update({'sprite': sprite})
         super().__init__(*args, **kwargs)
         self.parent = parent

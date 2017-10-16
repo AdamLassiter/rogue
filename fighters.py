@@ -2,7 +2,7 @@
 
 from random import randrange
 
-from constants import *
+from constants import PLAYER_KILL
 from objects import Object
 from effects import HitMarker, StoneGlare, Fireball
 from vector import vector
@@ -11,7 +11,7 @@ from vector import vector
 class Fighter(Object):
 
     def __init__(self, *args, stats: tuple = (0, 0, 0, 0), transparent: bool = True,
-                 **kwargs):
+                 **kwargs) -> None:
         self.max_hp, self.attack, self.defense, self.speed = stats
         self.hp = self.max_hp
         self.underneath = None
@@ -60,10 +60,10 @@ class Fighter(Object):
 class Player(Fighter):
 
     def __init__(self, *args, stats: tuple = (99, 1, 0, 4), sprite: str = '@',
-                 **kwargs):
+                 **kwargs) -> None:
         kwargs.update({'stats': stats, 'sprite': sprite})
         super().__init__(*args, **kwargs)
-        self.inventory = []
+        self.inventory: list = []
 
     def update(self):
         kp = self.game.keypresses
@@ -86,7 +86,7 @@ class Player(Fighter):
 class Goblin(Fighter):
 
     def __init__(self, *args, stats: tuple = (1, 1, 0, 2), sprite: str = 'g',
-                 **kwargs):
+                 **kwargs) -> None:
         kwargs.update({'stats': stats, 'sprite': sprite})
         super().__init__(*args, **kwargs)
 
@@ -112,7 +112,7 @@ class Goblin(Fighter):
 class Troll(Goblin):
 
     def __init__(self, *args, stats: tuple = (5, 2, 2, 1), sprite: str = 'T',
-                 **kwargs):
+                 **kwargs) -> None:
         kwargs.update({'stats': stats, 'sprite': sprite})
         super().__init__(*args, **kwargs)
 
@@ -120,7 +120,7 @@ class Troll(Goblin):
 class Gorgon(Fighter):
 
     def __init__(self, *args, stats: tuple = (5, 0, 5, 0), sprite: str = 'G',
-                 **kwargs):
+                 **kwargs) -> None:
         kwargs.update({'stats': stats, 'sprite': sprite})
         super().__init__(*args, **kwargs)
         self.explored = False
@@ -137,7 +137,7 @@ class Gorgon(Fighter):
 class Wizard(Fighter):
 
     def __init__(self, *args, stats: tuple = (3, 1, 0, 2), sprite: str = 'W',
-                 **kwargs):
+                 **kwargs) -> None:
         kwargs.update({'stats': stats, 'sprite': sprite})
         super().__init__(*args, **kwargs)
         self.fireball_counter = 0

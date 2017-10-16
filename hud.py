@@ -1,12 +1,11 @@
 #! /usr/bin/env python3
+"""
 
 from numpy import array
 
-from constants import *
+from constants import WHITE, OBJECT_SIZE, FONT_FILE
 from objects import Object, UpdateDrawable
 from vector import vector
-
-pygame.init()
 
 
 class Label(metaclass=UpdateDrawable):
@@ -109,3 +108,4 @@ class Hud(metaclass=UpdateDrawable):
         self.message_box.update()
         for label in self.labels:
             label.update()
+"""

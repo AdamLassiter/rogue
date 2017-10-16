@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
-from constants import *
-from effects import BonfireFlame
+from constants import BONFIRE_EVENT
+# from effects import BonfireFlame
 from objects import Object
 
 
@@ -26,7 +26,8 @@ class Tile(Object):
 
 class Air(Tile):
 
-    def __init__(self, *args, sprite: str = ' ', solid: bool = False, **kwargs):
+    def __init__(self, *args, sprite: str = ' ', solid: bool = False,
+                 **kwargs) -> None:
         kwargs.update({'sprite': sprite, 'solid': solid})
         super().__init__(*args, **kwargs)
 
@@ -37,21 +38,24 @@ class Air(Tile):
 
 class Dirt(Tile):
 
-    def __init__(self, *args, sprite: str = '.', solid: bool = False, **kwargs):
+    def __init__(self, *args, sprite: str = '.', solid: bool = False,
+                 **kwargs) -> None:
         kwargs.update({'sprite': sprite, 'solid': solid})
         super().__init__(*args, **kwargs)
 
 
 class Wall(Tile):
 
-    def __init__(self, *args, sprite: str = '#', solid: bool = True, **kwargs):
+    def __init__(self, *args, sprite: str = '#', solid: bool = True,
+                 **kwargs) -> None:
         kwargs.update({'sprite': sprite, 'solid': solid})
         super().__init__(*args, **kwargs)
 
 
 class Bonfire(Tile):
 
-    def __init__(self, *args, sprite: str = 'x', solid: bool = False, **kwargs):
+    def __init__(self, *args, sprite: str = 'x', solid: bool = False,
+                 **kwargs) -> None:
         kwargs.update({'sprite': sprite, 'solid': solid})
         super().__init__(*args, **kwargs)
 

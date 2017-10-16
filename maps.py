@@ -3,12 +3,11 @@
 from random import shuffle, choice, randrange
 import resource
 import sys
-from typing import *
 
 import pygame
 from numpy import array, concatenate, set_printoptions, inf
 
-from constants import *
+from constants import DISP_HEIGHT, DISP_WIDTH, ROOM_MIN_SIZE, ROOM_MAX_SIZE
 from objects import UpdateRenderable
 from tiles import Air, Wall, Dirt, Bonfire
 from fighters import Goblin, Gorgon, Wizard
@@ -23,7 +22,7 @@ pygame.init()
 
 class Room:
 
-    def __init__(self, x: int, y: int, w: int, h: int):
+    def __init__(self, x: int, y: int, w: int, h: int) -> None:
         self.x1, self.x2 = x, x + w - 1
         self.y1, self.y2 = y, y + h - 1
         self.w, self.h = w, h
@@ -52,11 +51,11 @@ class Room:
 
 class Map(metaclass=UpdateRenderable):
 
-    def __init__(self, game_ref, size: vector, from_map: array = None):
+    def __init__(self, game_ref, size: vector, from_map: array = None) -> None:
         self.game = game_ref
         self.size = size
         self.player_start = None
-        self.effects = []
+        self.effects: list = []
         if from_map is not None:
             self.map = from_map
         else:
@@ -97,6 +96,11 @@ class Map(metaclass=UpdateRenderable):
 
     @property
     def renders(self) -> list:
+        if not hasattr(self, 'mapslice'):
+            xc, yc, _ = position = self.game.player.position
+            x0, y0, _ = position - vector([DISP_WIDTH, DISP_HEIGHT, 0]) // 2
+            mslice = self[x0:x0 + DISP_WIDTH, y0:y0 + DISP_HEIGHT, :]
+            self.mapslice = MapSlice(self.game, mslice)
         effect_objs = [effect.render for effect in self.effects]
         tile_objs = self.mapslice.renders
         return effect_objs + tile_objs
@@ -113,7 +117,7 @@ class Map(metaclass=UpdateRenderable):
 
 class MapSlice(Map):
 
-    def __init__(self, game_ref, map_slice: array):
+    def __init__(self, game_ref, map_slice: array) -> None:
         size = vector([len(map_slice[0]), len(map_slice), len(map_slice[0, 0])])
         super().__init__(game_ref, size, from_map=map_slice)
 

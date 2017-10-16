@@ -1,55 +1,66 @@
 #! /usr/bin/env python3
 
-from functools import wraps
-from multiprocessing import Process
-from threading import Thread
 from time import time
 
-from OpenGL.GL import *
+import OpenGL.GL as GL
 # from OpenGL.arrays import vbo
-from OpenGL.GLU import *
-from OpenGL.GLUT import *
+import OpenGL.GLU as GLU
+import OpenGL.GLUT as GLUT
 from PIL import Image
 
 from vector import vector
+from wrappers import renderer, Memoize, multiprocess
 
 
 class GlLight:
-    modes = (GL_AMBIENT,
-             GL_DIFFUSE,
-             GL_SPECULAR,
-             GL_EMISSIVE)
-    lights = (GL_LIGHT0,
-              GL_LIGHT1,
-              GL_LIGHT2,
-              GL_LIGHT3,
-              GL_LIGHT4,
-              GL_LIGHT5,
-              GL_LIGHT6,
-              GL_LIGHT7)
+    modes = (GL.GL_AMBIENT,
+             GL.GL_DIFFUSE,
+             GL.GL_SPECULAR)
+    lights = (GL.GL_LIGHT0,
+              GL.GL_LIGHT1,
+              GL.GL_LIGHT2,
+              GL.GL_LIGHT3,
+              GL.GL_LIGHT4,
+              GL.GL_LIGHT5,
+              GL.GL_LIGHT6,
+              GL.GL_LIGHT7)
 
-    def __init__(self, centre: vector, colors: tuple,
-                 lightid: int):
+    def __init__(self, centre: vector, colors: tuple, lightid: int) -> None:
         self.position = centre
         self.colors = colors
         self.light = lightid
-        glEnable(lightid)
 
     def draw(self):
+        GL.glEnable(self.light)
         for mode, color in zip(GlLight.modes, self.colors):
-            glLightfv(self.light, mode, color)
-        glLightfv(self.light, GL_POSITION, self.position)
+            GL.glLightfv(self.light, mode, color)
+        GL.glLightfv(self.light, GL.GL_POSITION, self.position)
+
+    @property
+    def position(self):
+        x, y, z = self.pos
+        return vector([x, z, y])
+
+    @position.setter
+    def position(self, v: vector):
+        x, y, z = v
+        self.pos = vector([x, z, y])
 
 
 class GlObject:
-    vertices = ((0.45, 0.45, -0.45),
-                (-0.45, 0.45, -0.45),
-                (-0.45, 0.45, 0.45),
-                (0.45, 0.45, 0.45),
-                (0.45, -0.45, 0.45),
-                (-0.45, -0.45, 0.45),
-                (-0.45, -0.45, -0.45),
-                (0.45, -0.45, -0.45))
+    modes = (GL.GL_AMBIENT,
+             GL.GL_DIFFUSE,
+             GL.GL_SPECULAR,
+             GL.GL_SHININESS,
+             GL.GL_EMISSION)
+    vertices = [[0.5, 0.5, -0.5],
+                [-0.5, 0.5, -0.5],
+                [-0.5, 0.5, 0.5],
+                [0.5, 0.5, 0.5],
+                [0.5, -0.5, 0.5],
+                [-0.5, -0.5, 0.5],
+                [-0.5, -0.5, -0.5],
+                [0.5, -0.5, -0.5]]
     corners = ((1.0, 1.0),
                (0.0, 1.0),
                (0.0, 0.0),
@@ -58,135 +69,80 @@ class GlObject:
                 (7, 6, 5, 4),
                 (3, 2, 5, 4),
                 (1, 0, 7, 6),
-                (1, 2, 5, 6),
-                (3, 0, 7, 4),
-                )
+                (2, 1, 6, 5),
+                (0, 3, 4, 7))
 
-    def __init__(self, centre: vector, texid: int):
+    def __init__(self, centre: vector, colors: tuple, texid: int) -> None:
+        self.colors = colors
         self.position = vector(centre)
         self.texture = texid
 
     def draw(self):
-        glBindTexture(GL_TEXTURE_2D, self.texture)
-        glBegin(GL_QUADS)
+        for mode, color in zip(GlObject.modes, self.colors):
+            GL.glMaterialfv(GL.GL_FRONT, mode, color)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, self.texture)
+        GL.glBegin(GL.GL_QUADS)
         for vertex_ids in GlObject.surfaces:
             for tex_coord, vertex in zip(GlObject.corners, vertex_ids):
-                glTexCoord2f(*tex_coord)
-                glVertex3f(*self.vertices[vertex])
-        glEnd()
+                GL.glTexCoord2f(*tex_coord)
+                # GL.glColor4f(1, 1, 1, 0)
+                GL.glVertex3f(*self.vertices[vertex])
+        GL.glEnd()
 
     @property
     def position(self):
-        return self.pos
+        x, y, z = self.pos
+        return vector([x, z, y])
 
     @position.setter
     def position(self, v: vector):
         x, y, z = v
         self.pos = vector([x, z, y])
-        self.vertices = tuple(tuple(map(sum, zip(vertex, self.pos)))
-                              for vertex in GlObject.vertices)
-
-
-@wraps
-class Memoize:
-    def __init__(self, f):
-        self.f = f
-        self.memo = {}
-
-    def __call__(self, *args, **kwargs):
-        if args not in self.memo:
-            self.memo[args] = self.f(*args, **kwargs)
-        return self.memo[args]
-
-
-def renderer(func):
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        self.fps, dtime = time(), time() - self.fps
-        glutSetWindowTitle("FPS: %02d" % (1 / dtime,))
-        # glUseProgram(SHADER)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        glLoadIdentity()
-        gluLookAt(*self.camera_offset,
-                  *(0.0, 0.0, 0.0),
-                  *(0.0, 1.0, 0.0))
-        glRotatef(self.camera_rot[1], -1.0, 0.0, 0.0)
-        glRotatef(self.camera_rot[0], 0.0, 1.0, 0.0)
-        glTranslatef(*(self.camera_pos))
-        func(self, *args, **kwargs)
-        glutSwapBuffers()
-    return wrapper
-
-
-def multiprocess(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        process = Process(target=func, args=args, kwargs=kwargs)
-        process.start()
-        return process
-    return wrapper
-
-
-def thread(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        process = Thread(target=func, args=args, kwargs=kwargs)
-        process.start()
-        return process
-    return wrapper
-
-
-def timeit(method):
-    from time import time
-
-    def timed(*args, **kw):
-        ts = time()
-        result = method(*args, **kw)
-        te = time()
-        print(te - ts)
-        return result
-    return timed
+        self.vertices = [list(map(sum, zip(vertex, self.pos)))
+                         for vertex in GlObject.vertices]
 
 
 class GlManager:
 
-    def __init__(self, pipe, width: int, height: int, fov=45.0, depth=50.0):
+    def __init__(self, pipe, width: int, height: int, fov=45.0, depth=20.0) -> None:
         self.pipe = pipe
         self.fps = time()
         self.camera_pos = vector([0.0, 0.0, 0.0])
         self.camera_offset = vector([0, 10.0, -10.0])
         self.camera_rot = [180.0, 0.0]
-        self.textures = {}
-        self.keypresses = {}
-        self.renders = []
+        self.textures: dict = {}
+        self.keypresses: dict = {}
+        self.lights: list = []
+        self.renders: list = []
         # OpenGL stuff
         self.width, self.height = width, height
         self.fov, self.depth = fov, depth
 
     def gl_init(self):
-        glutInit()
-        glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH)
-        glutInitWindowSize(self.width, self.height)
-        glutInitWindowPosition(200, 200)
-        glutCreateWindow('')
-        glutSetCursor(GLUT_CURSOR_NONE)
-        glutSetKeyRepeat(GLUT_KEY_REPEAT_OFF)
-        glutKeyboardFunc(self.key_down)
-        glutKeyboardUpFunc(self.key_up)
-        glutPassiveMotionFunc(self.mouse_move)
-        glutIdleFunc(self.update)
-        glutDisplayFunc(self.update)
-        glClearColor(0.0, 0.0, 0.0, 0.0)
-        glClearDepth(1.0)
-        glDepthFunc(GL_LESS)
-        glEnable(GL_DEPTH_TEST)
-        glEnable(GL_LIGHTING)
-        glShadeModel(GL_SMOOTH)
-        glMatrixMode(GL_PROJECTION)
-        glLoadIdentity()
-        gluPerspective(self.fov, float(self.width) / float(self.height),
-                       0.1, self.depth)
-        glMatrixMode(GL_MODELVIEW)
+        GLUT.glutInit()
+        GLUT.glutInitDisplayMode(GLUT.GLUT_RGBA | GLUT.GLUT_DOUBLE | GLUT.GLUT_DEPTH)
+        GLUT.glutInitWindowSize(self.width, self.height)
+        GLUT.glutInitWindowPosition(200, 200)
+        GLUT.glutCreateWindow('')
+        GLUT.glutSetCursor(GLUT.GLUT_CURSOR_NONE)
+        GLUT.glutSetKeyRepeat(GLUT.GLUT_KEY_REPEAT_OFF)
+        GLUT.glutKeyboardFunc(self.key_down)
+        GLUT.glutKeyboardUpFunc(self.key_up)
+        GLUT.glutPassiveMotionFunc(self.mouse_move)
+        GLUT.glutIdleFunc(self.update)
+        GLUT.glutDisplayFunc(self.update)
+        GL.glEnable(GL.GL_LIGHTING)
+        GL.glShadeModel(GL.GL_SMOOTH)
+        GL.glClearColor(0.0, 0.0, 0.0, 0.0)
+        GL.glClearDepth(1.0)
+        GL.glDepthFunc(GL.GL_LESS)
+        GL.glEnable(GL.GL_DEPTH_TEST)
+        GL.glEnable(GL.GL_CULL_FACE)
+        GL.glMatrixMode(GL.GL_PROJECTION)
+        GL.glLoadIdentity()
+        GLU.gluPerspective(self.fov, float(self.width) / float(self.height),
+                           0.1, self.depth)
+        GL.glMatrixMode(GL.GL_MODELVIEW)
 
     def key_down(self, char, x, y):
         self.keypresses[char.decode('utf-8')] = 1
@@ -198,28 +154,29 @@ class GlManager:
         if x == 400 and y == 300:
             pass
         else:
-            glutWarpPointer(400, 300)
+            GLUT.glutWarpPointer(400, 300)
             self.camera_rot[0] += (x - 400) / 10
             self.camera_rot[1] += (y - 300) / 10
-        if self.camera_rot[1] > 45.0:
-            self.camera_rot[1] = 45.0
-        if self.camera_rot[1] < -45.0:
-            self.camera_rot[1] = -45.0
+        if self.camera_rot[1] > 35.0:
+            self.camera_rot[1] = 35.0
+        if self.camera_rot[1] < -35.0:
+            self.camera_rot[1] = -35.0
 
-    def camera_move(pos_lambda):
+    def camera_move(self, pos_lambda):
         def camera(*args):
             x, y, z = pos_lambda() * (-1, -1, 1)
             self.camera_pos = vector([x, z, y])
-            self.camera_move(func)
-            glutTimerFunc(1000 // 60, camera, 0)
+            self.camera_move(pos_lambda)
+            GLUT.glutTimerFunc(1000 // 60, camera, 0)
         return camera
 
     @renderer
     def render(self):
+        for light in self.lights:
+            light.draw()
         for obj in self.renders:
             if obj is not None:
                 obj.draw()
-        # self.hud.render()
 
     def update(self):
         if self.pipe.poll():
@@ -227,10 +184,10 @@ class GlManager:
             if req == 'keypresses':
                 self.pipe.send(self.keypresses)
             elif req == 'render':
-                self.renders, self.state, (x, y, z) = self.pipe.recv()
+                self.lights, self.renders, self.state, (x, y, z) = self.pipe.recv()
                 self.camera_pos = vector([-x, z, -y])
                 if self.state == 'quit':
-                    glutLeaveMainLoop()
+                    GLUT.glutLeaveMainLoop()
             elif req == 'textures':
                 for i in range(32, 128):
                     self.texture('font/%03d.png' % i)
@@ -242,22 +199,22 @@ class GlManager:
         picture = Image.open(path)
         width, height = picture.size
         pBits = picture.tobytes("raw", "RGBX", 0, -1)
-        glEnable(GL_TEXTURE_2D)
-        texid = glGenTextures(1)
-        glBindTexture(GL_TEXTURE_2D, texid)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
-        glTexImage2D(GL_TEXTURE_2D, 0, 3, width, height, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, pBits)
+        GL.glEnable(GL.GL_TEXTURE_2D)
+        texid = GL.glGenTextures(1)
+        GL.glBindTexture(GL.GL_TEXTURE_2D, texid)
+        GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_LINEAR)
+        GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, 3, width, height, 0, GL.GL_RGBA,
+                        GL.GL_UNSIGNED_BYTE, pBits)
         self.textures[path] = texid
         return texid
 
     def quit(self):
-        glutDestroyWindow(glutGetWindow())
-        sys.exit()
+        GLUT.glutDestroyWindow(GLUT.glutGetWindow())
+        GL.sys.exit()
 
     @multiprocess
     def loop(self):
         self.gl_init()
         # glutFullScreen()
-        glutMainLoop()
+        GLUT.glutMainLoop()
         self.quit()

@@ -26,11 +26,12 @@ class UpdateRenderable(type):
 class Object(object, metaclass=UpdateRenderable):
 
     def __init__(self, game_ref, position: vector, sprite: str = ' ',
-                 solid: bool = True, transparent: bool = None):
+                 solid: bool = True, transparent: bool = None) -> None:
         self.game = game_ref
         self.sprite = sprite
         texid = game_ref.textures['font/%03d.png' % ord(sprite)]
-        self.gl_obj = GlObject(position, texid)
+        # TODO: Colors
+        self.gl_obj = GlObject(position, [[1] + [0] * 3] * 3, texid)
         self.position = position
         self.solid = solid
         self.transparent = not solid if transparent is None else transparent
@@ -92,7 +93,7 @@ class Object(object, metaclass=UpdateRenderable):
                 error += dx
         return list(reversed(points)) if swapped else points
 
-    def visible(self, other_position: vector) -> int:
+    def visible(self, other_position: vector) -> float:
         if self.position == other_position:
             return True
         line_of_sight = self.bresenham(self.position, other_position)[1:-1]
