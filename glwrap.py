@@ -44,7 +44,8 @@ class GlLight:
     @position.setter
     def position(self, v: vector):
         x, y, z = v
-        self.pos = vector([x, z, y])
+        # self.pos = vector([x, z, y])
+        self.pos = vector([0, 0, 3])
 
 
 class GlObject:
@@ -185,7 +186,7 @@ class GlManager:
                 self.pipe.send(self.keypresses)
             elif req == 'render':
                 self.lights, self.renders, self.state, (x, y, z) = self.pipe.recv()
-                self.camera_pos = vector([-x, z, -y])
+                self.camera_pos = vector([-x, -z, -y])
                 if self.state == 'quit':
                     GLUT.glutLeaveMainLoop()
             elif req == 'textures':

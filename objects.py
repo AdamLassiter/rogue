@@ -31,7 +31,8 @@ class Object(object, metaclass=UpdateRenderable):
         self.sprite = sprite
         texid = game_ref.textures['font/%03d.png' % ord(sprite)]
         # TODO: Colors
-        self.gl_obj = GlObject(position, [[1] + [0] * 3] * 3, texid)
+        self.gl_obj = GlObject(position, [[0]*4, [1]*4, [.1]*4],
+                               texid)
         self.position = position
         self.solid = solid
         self.transparent = not solid if transparent is None else transparent

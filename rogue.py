@@ -2,7 +2,7 @@
 
 from copy import copy
 import multiprocessing as mp
-# from time import sleep, time
+from time import sleep, time
 
 import constants as CONST
 from glwrap import GlManager, GlLight
@@ -37,7 +37,7 @@ class GameManager:
         for i, event in enumerate(reversed(self.events)):
             if event in (CONST.QUIT, CONST.LADDER_EVENT):
                 self.state = 'quit'
-            elif self.keypresses.get(chr(27), 0):
+            elif self.keypresses.get('q', 0):
                 self.state = 'quit'
             elif event == CONST.PLAYER_KILL:
                 self.init(type(self.map))
@@ -47,7 +47,7 @@ class GameManager:
 
     def loop(self):
         while self.state == 'game':
-            # t0 = time()
+            t0 = time()
             self.pipe.send('keypresses')
             self.keypresses = self.pipe.recv()
             self.map.update()
@@ -56,11 +56,11 @@ class GameManager:
             colors = ((0.1, 0.1, 0.1, 1.0),
                       (1.0, 0.3, 0.0, 1.0),
                       (1.0, 1.0, 1.0, 1.0))
-            light = GlLight(pos + (0, 0, 4), colors, GlLight.lights[0])
+            light = GlLight(pos, colors, GlLight.lights[0])
             self.pipe.send('render')
             self.pipe.send([[light], self.map.renders, self.state, pos])
-            # sleep_time = 0.125 - (t0 - time())
-            # sleep(sleep_time if sleep_time > 0.01 else 0.01)
+            sleep_time = 0.125 - (t0 - time())
+            sleep(sleep_time) if sleep_time > 0 else None
 
 
 def main():
